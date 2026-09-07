@@ -1,6 +1,4 @@
 # VoiceShield backend dependencies
-# ML model stack (Transformers, SpeechBrain, Torchaudio, ECAPA-TDNN,
-# Wav2Vec2) is intentionally excluded and added in its own phase.
 # Librosa is used for high-quality resampling and silence trimming; it
 # pulls in numpy/scipy/numba/scikit-learn transitively.
 
@@ -34,6 +32,11 @@ imageio-ffmpeg==0.6.0
 #   pip install torch --index-url https://download.pytorch.org/whl/cu124
 torch==2.14.0
 transformers==5.16.1
+
+# Speaker verification (ECAPA-TDNN via SpeechBrain)
+# torchaudio==2.11.0 is the newest release aligned with torch 2.14.0.
+speechbrain==1.1.1
+torchaudio==2.11.0
 
 # Testing
 pytest==8.3.4

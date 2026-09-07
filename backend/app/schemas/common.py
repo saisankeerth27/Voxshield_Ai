@@ -10,6 +10,10 @@ class HealthResponse(BaseModel):
     deepfake_model: str | None = None
     model_name: str | None = None
     model_device: str | None = None
+    speaker_model: str | None = None
+    speaker_model_name: str | None = None
+    speaker_model_version: str | None = None
+    speaker_model_device: str | None = None
 
 
 class ErrorDetail(BaseModel):

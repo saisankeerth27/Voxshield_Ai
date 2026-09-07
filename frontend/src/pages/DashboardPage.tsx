@@ -30,9 +30,16 @@ function detectionStatus(analysis: AudioAnalysis | null): string {
     : "Real voice";
 }
 
+function formatSimilarity(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "Not analyzed";
+  return value.toFixed(4);
+}
+
 function MetricSection({ analysis }: { analysis: AudioAnalysis | null }) {
   const ai = analysis?.ai_probability ?? null;
   const real = analysis?.real_probability ?? null;
+  const similarity = analysis?.speaker_similarity ?? null;
+  const verified = analysis?.speaker_verified ?? null;
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <MetricCard
@@ -55,7 +62,12 @@ function MetricSection({ analysis }: { analysis: AudioAnalysis | null }) {
       />
       <MetricCard
         label="Speaker Similarity"
-        value="Not analyzed"
+        value={
+          verified === null
+            ? "Not analyzed"
+            : `${formatSimilarity(similarity)} (${verified ? "Matches" : "No match"})`
+        }
+        status={similarity === null ? "idle" : verified === true ? "ok" : "warn"}
         icon={<Fingerprint className="h-5 w-5" />}
       />
       <MetricCard
@@ -96,6 +108,7 @@ function statusVariant(status: string): "ok" | "warn" | "danger" | "idle" {
   switch (status) {
     case "COMPLETED":
     case "DEEPFAKE_ANALYZED":
+    case "SPEAKER_ANALYZED":
       return "ok";
     case "FAILED":
       return "danger";
@@ -221,6 +234,18 @@ export default function DashboardPage() {
                   page.
                 </p>
               )}
+              {latest.speaker_similarity !== null ? (
+                <p
+                  className={`mt-1 ${latest.speaker_verified ? "text-emerald-400" : "text-amber-400"}`}
+                >
+                  {latest.speaker_verified
+                    ? "Speaker matches the registered voiceprint."
+                    : "Speaker does not match the registered voiceprint."}{" "}
+                  <span className="text-slate-500">
+                    (similarity {formatSimilarity(latest.speaker_similarity)})
+                  </span>
+                </p>
+              ) : null}
             </div>
           ) : (
             <p className="text-sm text-slate-400">
@@ -275,19 +300,19 @@ export default function DashboardPage() {
           <ul className="space-y-2 text-sm text-slate-400">
             <li className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              Audio upload pipeline: Operational (Phase 2)
+              Audio upload pipeline: Operational
             </li>
             <li className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              Audio preprocessing: Operational (Phase 3)
+              Audio preprocessing: Operational
             </li>
             <li className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              Deepfake voice detection: Operational (Phase 4)
+              Deepfake voice detection: Operational
             </li>
             <li className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-slate-600" />
-              Speaker verification: Pending (later phase)
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              Speaker verification: Operational
             </li>
             <li className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-slate-600" />

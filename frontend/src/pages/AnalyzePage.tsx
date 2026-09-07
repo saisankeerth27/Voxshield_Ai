@@ -9,6 +9,7 @@ import {
   ScanLine,
   Square,
   TriangleAlert,
+  Users,
   Wand2,
 } from "lucide-react";
 import { useRecorder } from "../hooks/useRecorder";
@@ -24,6 +25,8 @@ import FileDropzone from "../components/FileDropzone";
 import type {
   AudioPreprocessResponse,
   DeepfakeRunResponse,
+  SpeakerProfileStatusResponse,
+  SpeakerVerifyResponse,
 } from "../types/analysis";
 import type { UploadFlowState } from "../types/audio";
 
@@ -70,6 +73,13 @@ interface DetectState {
   error: string | null;
 }
 
+interface VerifyState {
+  phase: "idle" | "verifying" | "done" | "error";
+  result: SpeakerVerifyResponse | null;
+  error: string | null;
+  profile: SpeakerProfileStatusResponse | null;
+}
+
 const INITIAL_PREPARE: PrepareState = {
   phase: "idle",
   result: null,
@@ -80,6 +90,13 @@ const INITIAL_DETECT: DetectState = {
   phase: "idle",
   result: null,
   error: null,
+};
+
+const INITIAL_VERIFY: VerifyState = {
+  phase: "idle",
+  result: null,
+  error: null,
+  profile: null,
 };
 
 function formatSampleRate(rate: number | null): string {
@@ -228,17 +245,26 @@ function AnalysisProgress({
   prepared,
   detecting,
   detected,
+  verifying,
+  verified,
 }: {
   uploaded: boolean;
   preparing: boolean;
   prepared: boolean;
   detecting: boolean;
   detected: boolean;
+  verifying: boolean;
+  verified: boolean;
 }) {
   const steps = [
     { label: "Upload audio", done: uploaded, active: false },
     { label: "Prepare audio", done: prepared, active: preparing },
     { label: "Deepfake detection", done: detected, active: detecting },
+    {
+      label: "Speaker verification",
+      done: verified,
+      active: verifying,
+    },
   ];
   return (
     <div className="rounded-xl border border-white/5 bg-surface-light p-4">
@@ -274,12 +300,14 @@ export default function AnalyzePage() {
   const upload = useUploadFlow();
   const [prepare, setPrepare] = useState<PrepareState>(INITIAL_PREPARE);
   const [detect, setDetect] = useState<DetectState>(INITIAL_DETECT);
+  const [verify, setVerify] = useState<VerifyState>(INITIAL_VERIFY);
 
   const uploadError = upload.state === "ERROR" ? upload.error : null;
 
   useEffect(() => {
     setPrepare(INITIAL_PREPARE);
     setDetect(INITIAL_DETECT);
+    setVerify(INITIAL_VERIFY);
   }, [upload.uploadResult?.analysis_id]);
 
   const runPreprocess = async () => {
@@ -308,6 +336,41 @@ export default function AnalyzePage() {
     }
   };
 
+  const refreshProfileStatus = async () => {
+    try {
+      const profile = await audioService.getProfileStatus();
+      setVerify((prev) => ({ ...prev, profile }));
+    } catch {
+      setVerify((prev) => ({ ...prev, profile: null }));
+    }
+  };
+
+  const runVerify = async () => {
+    if (!upload.uploadResult) return;
+    const analysisId = upload.uploadResult.analysis_id;
+    setVerify((prev) => ({ ...prev, phase: "verifying", result: null, error: null }));
+    try {
+      const result = await audioService.runSpeakerVerification(analysisId);
+      setVerify((prev) => ({
+        ...prev,
+        phase: "done",
+        result,
+        error: null,
+        profile: prev.profile,
+      }));
+      void refreshProfileStatus();
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Speaker verification failed");
+      setVerify((prev) => ({ ...prev, phase: "error", result: null, error: message }));
+    }
+  };
+
+  useEffect(() => {
+    if (upload.uploadResult && prepare.phase === "done") {
+      void refreshProfileStatus();
+    }
+  }, [upload.uploadResult, prepare.phase]);
+
   const processedUrl = prepare.result
     ? audioService.processedUrl(prepare.result.analysis_id)
     : null;
@@ -316,8 +379,8 @@ export default function AnalyzePage() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-3xl font-bold">Voice Analysis</h1>
       <p className="mt-1 text-sm text-slate-400">
-        Upload audio, prepare it, and run AI deepfake detection. Additional
-        ML capabilities arrive in later phases.
+        Upload audio, prepare it, run AI deepfake detection, and verify the
+        speaker against a registered voiceprint.
       </p>
 
       {/* Source tabs */}
@@ -354,6 +417,8 @@ export default function AnalyzePage() {
             prepared={prepare.phase === "done"}
             detecting={detect.phase === "detecting"}
             detected={detect.phase === "done"}
+            verifying={verify.phase === "verifying"}
+            verified={verify.phase === "done"}
           />
         </div>
       ) : null}
@@ -632,6 +697,145 @@ export default function AnalyzePage() {
                       <p className="mt-0.5 break-words text-xs">{detect.error}</p>
                       <button
                         onClick={() => void runDeepfake()}
+                        className="mt-2 rounded-md border border-red-500/40 px-3 py-1 text-xs font-medium hover:bg-red-500/20 transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* Verify speaker step */}
+            {upload.state === "UPLOADED" &&
+            upload.uploadResult &&
+            prepare.phase === "done" ? (
+              <div className="mt-4 rounded-xl border border-white/5 bg-surface p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-emerald-400" />
+                    <h3 className="font-semibold text-slate-200">
+                      Speaker Verification
+                    </h3>
+                  </div>
+                  {verify.phase === "done" && verify.result ? (
+                    <StatusBadge
+                      label={
+                        verify.result.verified === true
+                          ? "VERIFIED"
+                          : verify.result.verified === false
+                            ? "NOT VERIFIED"
+                            : verify.result.speaker_verification_status
+                      }
+                      variant={verify.result.verified === true ? "ok" : "warn"}
+                    />
+                  ) : null}
+                </div>
+
+                {verify.phase === "idle" ? (
+                  <>
+                    {verify.profile && !verify.profile.has_profile ? (
+                      <p className="mt-2 text-xs text-amber-400">
+                        No speaker profile is registered yet. Create one on the{" "}
+                        <a
+                          href="/profile"
+                          className="underline underline-offset-2"
+                        >
+                          Speaker Profile
+                        </a>{" "}
+                        page first.
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-xs text-slate-500">
+                        Compare this audio's voiceprint to the registered
+                        speaker ("{verify.profile?.profile?.name ?? "—"}") using
+                        the ECAPA-TDNN model's cosine similarity.
+                      </p>
+                    )}
+
+                    <button
+                      onClick={() => void runVerify()}
+                      disabled={!verify.profile?.has_profile}
+                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-surface hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40 enabled:transition-colors"
+                    >
+                      <Users className="h-4 w-4" />
+                      Verify Speaker
+                    </button>
+                  </>
+                ) : null}
+
+                {verify.phase === "verifying" ? (
+                  <div className="mt-3 flex items-center gap-2 text-slate-300">
+                    <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                    <span className="text-sm">Verifying speaker…</span>
+                  </div>
+                ) : null}
+
+                {verify.phase === "done" && verify.result ? (
+                  <div className="mt-3 space-y-3">
+                    <div className="rounded-lg bg-surface-light/60 p-3">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-slate-400">
+                          Speaker similarity
+                        </span>
+                        <span className="font-mono text-slate-200">
+                          {verify.result.similarity_score !== null
+                            ? verify.result.similarity_score.toFixed(4)
+                            : "—"}
+                        </span>
+                      </div>
+                      <p
+                        className={`mt-2 text-sm font-medium ${
+                          verify.result.verified === true
+                            ? "text-emerald-400"
+                            : "text-amber-400"
+                        }`}
+                      >
+                        {verify.result.verified === true
+                          ? "Voiceprint matches the registered speaker"
+                          : "Voiceprint does not match the registered speaker"}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Cosine similarity vs. reference "{
+                          verify.result.reference_name ?? "registered speaker"
+                        }". Threshold is an uncalibrated MVP default - tune it
+                        before security-critical use.
+                      </p>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      {verify.result.speaker_model ? (
+                        <>
+                          Model{" "}
+                          <span className="font-mono">
+                            {verify.result.speaker_model}
+                          </span>
+                          {" · "}
+                          {verify.result.speaker_device} ·{" "}
+                          {Number(
+                            verify.result.speaker_processing_time ?? 0,
+                          ).toFixed(1)}{" "}
+                          s
+                        </>
+                      ) : (
+                        "No speaker result stored (see error)."
+                      )}
+                    </p>
+                  </div>
+                ) : null}
+
+                {verify.phase === "error" ? (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                    <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium">
+                        Speaker verification could not run
+                      </p>
+                      <p className="mt-0.5 break-words text-xs">
+                        {verify.error}
+                      </p>
+                      <button
+                        onClick={() => void runVerify()}
                         className="mt-2 rounded-md border border-red-500/40 px-3 py-1 text-xs font-medium hover:bg-red-500/20 transition-colors"
                       >
                         Retry

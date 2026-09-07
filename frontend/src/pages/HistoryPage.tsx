@@ -11,6 +11,8 @@ const PAGE_SIZE = 10;
 function statusVariant(status: string): "ok" | "warn" | "danger" | "idle" {
   switch (status) {
     case "COMPLETED":
+    case "DEEPFAKE_ANALYZED":
+    case "SPEAKER_ANALYZED":
       return "ok";
     case "FAILED":
       return "danger";
@@ -19,6 +21,20 @@ function statusVariant(status: string): "ok" | "warn" | "danger" | "idle" {
     default:
       return "idle";
   }
+}
+
+function formatProbability(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "—";
+  }
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatSimilarity(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "—";
+  }
+  return value.toFixed(4);
 }
 
 export default function HistoryPage() {
@@ -105,6 +121,8 @@ export default function HistoryPage() {
                 <th className="px-4 py-3 font-medium">Filename</th>
                 <th className="px-4 py-3 font-medium">Size</th>
                 <th className="px-4 py-3 font-medium">Uploaded</th>
+                <th className="px-4 py-3 font-medium">AI Prob.</th>
+                <th className="px-4 py-3 font-medium">Speaker</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 text-right font-medium">Actions</th>
               </tr>
@@ -126,6 +144,22 @@ export default function HistoryPage() {
                   </td>
                   <td className="px-4 py-3 text-slate-400">
                     {formatTimestamp(item.created_at)}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-slate-300">
+                    {formatProbability(item.ai_probability)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {item.speaker_similarity !== null && item.speaker_similarity !== undefined ? (
+                      <span
+                        className={
+                          item.speaker_verified ? "text-emerald-400" : "text-amber-400"
+                        }
+                      >
+                        {formatSimilarity(item.speaker_similarity)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-600">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge

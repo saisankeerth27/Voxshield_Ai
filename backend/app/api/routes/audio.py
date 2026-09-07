@@ -59,6 +59,11 @@ def list_audio(
             filename=record.original_filename,
             file_size=record.file_size,
             status=record.status.value,
+            ai_probability=record.ai_probability,
+            deepfake_label=record.deepfake_label,
+            speaker_verification_status=record.speaker_verification_status,
+            speaker_similarity=record.speaker_similarity,
+            speaker_verified=record.speaker_verified,
             created_at=record.created_at,
         )
         for record in records
@@ -98,6 +103,14 @@ def get_audio(
         deepfake_processing_time=record.deepfake_processing_time,
         deepfake_device=record.deepfake_device,
         deepfake_error=record.deepfake_error,
+        speaker_verification_status=record.speaker_verification_status,
+        speaker_similarity=record.speaker_similarity,
+        speaker_verified=record.speaker_verified,
+        speaker_model=record.speaker_model,
+        speaker_model_version=record.speaker_model_version,
+        speaker_processing_time=record.speaker_processing_time,
+        speaker_device=record.speaker_device,
+        speaker_error=record.speaker_error,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )

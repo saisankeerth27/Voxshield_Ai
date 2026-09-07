@@ -46,6 +46,14 @@ class AudioAnalysisResponse(BaseModel):
     deepfake_processing_time: float | None
     deepfake_device: str | None
     deepfake_error: str | None
+    speaker_verification_status: str | None = None
+    speaker_similarity: float | None = None
+    speaker_verified: bool | None = None
+    speaker_model: str | None = None
+    speaker_model_version: str | None = None
+    speaker_processing_time: float | None = None
+    speaker_device: str | None = None
+    speaker_error: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -85,6 +93,11 @@ class AudioListItemResponse(BaseModel):
     filename: str
     file_size: int
     status: str
+    ai_probability: float | None = None
+    deepfake_label: str | None = None
+    speaker_verification_status: str | None = None
+    speaker_similarity: float | None = None
+    speaker_verified: bool | None = None
     created_at: datetime
 
 

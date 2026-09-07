@@ -21,10 +21,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.database import Base
-from app.models.enums import AudioAnalysisStatus
+from app.models.enums import AudioAnalysisStatus, SpeakerVerificationStatus
 
 
-def _enum_values(cls: type[AudioAnalysisStatus]) -> list[str]:
+def _enum_values(cls: type[AudioAnalysisStatus] | type[SpeakerVerificationStatus]) -> list[str]:
     return [member.value for member in cls]
 
 
@@ -85,6 +85,25 @@ class AudioAnalysis(Base):
     )
     deepfake_device: Mapped[str | None] = mapped_column(String(50), nullable=True)
     deepfake_error: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+
+    # Speaker verification (filled by the speaker verification pipeline).
+    # Per-module status independent of the top-level lifecycle enum.
+    # Stored as a plain string (no PG native enum) so the forward migration
+    # (VARCHAR column) and create_all stay consistent across environments.
+    speaker_verification_status: Mapped[SpeakerVerificationStatus | None] = (
+        mapped_column(String(20), nullable=True)
+    )
+    speaker_similarity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    speaker_verified: Mapped[bool | None] = mapped_column(nullable=True)
+    speaker_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    speaker_model_version: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )
+    speaker_processing_time: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )
+    speaker_device: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    speaker_error: Mapped[str | None] = mapped_column(String(2000), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

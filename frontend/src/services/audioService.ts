@@ -8,6 +8,12 @@ import type {
   DeepfakeResultResponse,
   DeepfakeRunResponse,
   PreprocessStatusResponse,
+  SpeakerProfileDeleteResponse,
+  SpeakerProfileListResponse,
+  SpeakerProfileStatusResponse,
+  SpeakerProfile,
+  SpeakerResultResponse,
+  SpeakerVerifyResponse,
 } from "../types/analysis";
 
 /**
@@ -102,6 +108,71 @@ export const audioService = {
   /** Probe which analysis capabilities are currently available. */
   async getAnalysisStatus(): Promise<AnalysisStatusResponse> {
     const response = await api.get<AnalysisStatusResponse>("/analysis/status");
+    return response.data;
+  },
+
+  /**
+   * Register (or replace) the speaker profile from a reference recording.
+   * The reference audio is deleted server-side after the voiceprint is
+   * extracted; the embedding itself is never exposed to the client.
+   */
+  async registerProfile(
+    name: string,
+    file: File,
+    onProgress?: (progress: number) => void,
+  ): Promise<SpeakerProfile> {
+    const formData = new FormData();
+    formData.append("speaker_name", name);
+    formData.append("reference_audio", file);
+    const response = await api.post<SpeakerProfile>("/profile", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 300000,
+      onUploadProgress: (event) => {
+        if (event.total && onProgress) {
+          onProgress(event.loaded / event.total);
+        }
+      },
+    });
+    return response.data;
+  },
+
+  /** List stored speaker profiles (metadata only - never the embedding). */
+  async getProfiles(): Promise<SpeakerProfileListResponse> {
+    const response = await api.get<SpeakerProfileListResponse>("/profile");
+    return response.data;
+  },
+
+  /** Probe whether a speaker profile is currently registered. */
+  async getProfileStatus(): Promise<SpeakerProfileStatusResponse> {
+    const response = await api.get<SpeakerProfileStatusResponse>(
+      "/profile/status",
+    );
+    return response.data;
+  },
+
+  /** Delete a profile and its stored voiceprint bytes. */
+  async deleteProfile(profileId: string): Promise<SpeakerProfileDeleteResponse> {
+    const response = await api.delete<SpeakerProfileDeleteResponse>(
+      `/profile/${profileId}`,
+    );
+    return response.data;
+  },
+
+  /** Run speaker verification on a preprocessed analysis. */
+  async runSpeakerVerification(analysisId: string): Promise<SpeakerVerifyResponse> {
+    const response = await api.post<SpeakerVerifyResponse>(
+      `/analysis/${analysisId}/speaker`,
+      undefined,
+      { timeout: 300000 },
+    );
+    return response.data;
+  },
+
+  /** Fetch the stored speaker result without re-running inference. */
+  async getSpeakerResult(analysisId: string): Promise<SpeakerResultResponse> {
+    const response = await api.get<SpeakerResultResponse>(
+      `/analysis/${analysisId}/speaker`,
+    );
     return response.data;
   },
 

@@ -15,11 +15,36 @@ import logging
 import threading
 
 from app.core.config import settings
-from app.core.exceptions import DeepfakeModelUnavailableError
-from app.ml.base import DeepfakeDetector
+from app.core.exceptions import (
+    DeepfakeModelUnavailableError,
+    SpeakerModelUnavailableError,
+)
+from app.ml.base import DeepfakeDetector, SpeakerVerifier
 from app.ml.schemas import DetectorStatus
 
 logger = logging.getLogger("voiceshield.ml")
+
+
+def _resolve_device(requested_raw: str | None) -> str:
+    """auto -> GPU if CUDA is available, otherwise CPU. Shared by managers."""
+    import torch
+
+    requested = (requested_raw or "auto").strip().lower()
+    if requested == "cuda":
+        if torch.cuda.is_available():
+            return "cuda"
+        logger.warning(
+            "MODEL_DEVICE=cuda requested but CUDA is unavailable; using CPU"
+        )
+        return "cpu"
+    if requested == "cpu":
+        return "cpu"
+    # auto
+    if torch.cuda.is_available():
+        logger.info("Device: CUDA")
+        return "cuda"
+    logger.info("Device: CPU")
+    return "cpu"
 
 
 class DeepfakeModelManager:
@@ -113,25 +138,7 @@ class DeepfakeModelManager:
         )
 
     def _resolve_device(self) -> str:
-        """auto -> GPU if CUDA is available, otherwise CPU."""
-        import torch
-
-        requested = (settings.model_device or "auto").strip().lower()
-        if requested == "cuda":
-            if torch.cuda.is_available():
-                return "cuda"
-            logger.warning(
-                "MODEL_DEVICE=cuda requested but CUDA is unavailable; using CPU"
-            )
-            return "cpu"
-        if requested == "cpu":
-            return "cpu"
-        # auto
-        if torch.cuda.is_available():
-            logger.info("Device: CUDA")
-            return "cuda"
-        logger.info("Device: CPU")
-        return "cpu"
+        return _resolve_device(settings.model_device)
 
     def _build_detector(self, device: str) -> DeepfakeDetector:
         from transformers import (
@@ -159,3 +166,113 @@ class DeepfakeModelManager:
 
 
 deepfake_model_manager = DeepfakeModelManager()
+
+
+class SpeakerVerifierManager:
+    """Owns the lifetime of the loaded speaker verification model."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._verifier: SpeakerVerifier | None = None
+        self._state: str = "not_loaded"
+        self._device: str | None = None
+        self._name: str | None = None
+        self._version: str | None = None
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def status(self) -> DetectorStatus:
+        with self._lock:
+            return DetectorStatus(
+                state=self._state,
+                model_name=self._name,
+                model_version=self._version,
+                device=self._device,
+            )
+
+    def get_verifier(self) -> SpeakerVerifier:
+        """Return a ready verifier, loading it if necessary.
+
+        Raises ``SpeakerModelUnavailableError`` (HTTP 503) when the model
+        cannot be loaded - the caller must not produce a result then.
+        """
+        with self._lock:
+            if self._verifier is not None:
+                return self._verifier
+            self._load_unlocked()
+            assert self._verifier is not None
+            return self._verifier
+
+    def load_in_background(self) -> None:
+        """Best-effort startup load so the first request is fast."""
+
+        def _load_async() -> None:
+            try:
+                self.get_verifier()
+            except Exception:
+                pass  # state already recorded; requests will surface it
+
+        thread = threading.Thread(
+            target=_load_async, daemon=True, name="speaker-model-load"
+        )
+        thread.start()
+
+    def force_reload(self) -> SpeakerVerifier:
+        with self._lock:
+            self._verifier = None
+            self._state = "not_loaded"
+            self._load_unlocked()
+            assert self._verifier is not None
+            return self._verifier
+
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
+    def _load_unlocked(self) -> None:
+        self._state = "loading"
+        try:
+            device = _resolve_device(settings.model_device)
+            verifier = self._build_verifier(device)
+        except Exception:
+            self._state = "unavailable"
+            logger.exception(
+                "Speaker model failed to load model=%s",
+                settings.speaker_model_name,
+            )
+            raise SpeakerModelUnavailableError() from None
+
+        self._verifier = verifier
+        self._state = "loaded"
+        self._device = device
+        self._name = verifier.name
+        self._version = verifier.version
+        logger.info(
+            "Speaker model loaded model=%s revision=%s device=%s",
+            verifier.name,
+            verifier.version,
+            device,
+        )
+
+    def _build_verifier(self, device: str) -> SpeakerVerifier:
+        from speechbrain.inference.speaker import EncoderClassifier
+        from speechbrain.utils.fetching import LocalStrategy
+
+        name = settings.speaker_model_name
+        savedir = settings.speaker_model_savedir or None
+
+        encoder = EncoderClassifier.from_hparams(
+            source=name,
+            savedir=savedir,
+            run_opts={"device": device},
+            local_strategy=LocalStrategy.COPY_SKIP_CACHE,
+        )
+
+        from app.ml.speaker_verifier import ECAPASpeakerVerifier
+
+        return ECAPASpeakerVerifier(
+            encoder=encoder, device=device, name=name
+        )
+
+
+speaker_verifier_manager = SpeakerVerifierManager()

@@ -60,6 +60,19 @@ class Settings(BaseSettings):
     # Minimum segment duration that is meaningful for the model (seconds)
     model_min_chunk_seconds: float = 0.5
 
+    # Speaker verification (Phase 5 - ECAPA-TDNN speaker recognition)
+    # Pretrained SpeechBrain ECAPA-TDNN trained on VoxCeleb 1+2.
+    speaker_model_name: str = "speechbrain/spkrec-ecapa-voxceleb"
+    # Where SpeechBrain materialises the downloaded model (gitignored).
+    speaker_model_savedir: str = "models/speaker"
+    # Configurable verification threshold. This is an MVP default and is NOT
+    # scientifically calibrated for this dataset/domain - it must be tuned
+    # on representative validation data before any security-critical use.
+    speaker_similarity_threshold: float = 0.25
+    # Audio must contain at least this much speech (16 kHz) to generate a
+    # stable speaker embedding (both for profiles and verification).
+    min_speaker_duration_seconds: float = 1.0
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

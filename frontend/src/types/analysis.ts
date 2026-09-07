@@ -7,6 +7,13 @@ export type AnalysisStatus =
   | "PROCESSING"
   | "COMPLETED"
   | "DEEPFAKE_ANALYZED"
+  | "SPEAKER_ANALYZED"
+  | "FAILED";
+
+export type SpeakerVerificationStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "VERIFIED"
   | "FAILED";
 
 export const MAX_UPLOAD_SIZE_MB = 25;
@@ -64,6 +71,14 @@ export interface AudioAnalysis {
   deepfake_processing_time: number | null;
   deepfake_device: string | null;
   deepfake_error: string | null;
+  speaker_verification_status: SpeakerVerificationStatus | null;
+  speaker_similarity: number | null;
+  speaker_verified: boolean | null;
+  speaker_model: string | null;
+  speaker_model_version: string | null;
+  speaker_processing_time: number | null;
+  speaker_device: string | null;
+  speaker_error: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -73,6 +88,11 @@ export interface AudioListItem {
   filename: string;
   file_size: number;
   status: AnalysisStatus;
+  ai_probability?: number | null;
+  deepfake_label?: string | null;
+  speaker_verification_status?: SpeakerVerificationStatus | null;
+  speaker_similarity?: number | null;
+  speaker_verified?: boolean | null;
   created_at: string;
 }
 
@@ -110,5 +130,68 @@ export interface DeepfakeResultResponse {
 export interface AnalysisStatusResponse {
   available: boolean;
   deepfake: boolean;
+  speaker: boolean;
   message: string;
+}
+
+export interface SpeakerProfile {
+  profile_id: string;
+  name: string;
+  embedding_dim: number;
+  model_name: string;
+  model_version: string;
+  device: string | null;
+  sample_rate: number;
+  duration_seconds: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpeakerProfileListResponse {
+  items: SpeakerProfile[];
+  count: number;
+  has_profile: boolean;
+}
+
+export interface SpeakerProfileStatusResponse {
+  available: boolean;
+  has_profile: boolean;
+  profile: SpeakerProfile | null;
+  message: string;
+}
+
+export interface SpeakerProfileDeleteResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface SpeakerVerifyResponse {
+  analysis_id: string;
+  status: AnalysisStatus;
+  speaker_verification_status: SpeakerVerificationStatus;
+  verified: boolean;
+  similarity_score: number | null;
+  speaker_model: string | null;
+  speaker_model_version: string | null;
+  speaker_processing_time: number | null;
+  speaker_device: string | null;
+  speaker_error: string | null;
+  reference_profile_id: string | null;
+  reference_name: string | null;
+  message: string;
+}
+
+export interface SpeakerResultResponse {
+  analysis_id: string;
+  status: AnalysisStatus;
+  verified: boolean | null;
+  similarity_score: number | null;
+  speaker_verification_status: SpeakerVerificationStatus | null;
+  speaker_model: string | null;
+  speaker_model_version: string | null;
+  speaker_processing_time: number | null;
+  speaker_device: string | null;
+  speaker_error: string | null;
+  reference_profile_id: string | null;
+  reference_name: string | null;
 }

@@ -5,6 +5,12 @@ Import every model here so SQLAlchemy registers its table on
 """
 
 from app.models.audio import AudioAnalysis  # noqa: F401
-from app.models.enums import AudioAnalysisStatus  # noqa: F401
+from app.models.enums import AudioAnalysisStatus, SpeakerVerificationStatus  # noqa: F401
+from app.models.speaker import SpeakerProfile  # noqa: F401
 
-__all__ = ["AudioAnalysis", "AudioAnalysisStatus"]
+__all__ = [
+    "AudioAnalysis",
+    "AudioAnalysisStatus",
+    "SpeakerVerificationStatus",
+    "SpeakerProfile",
+]

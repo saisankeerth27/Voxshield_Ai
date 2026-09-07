@@ -102,6 +102,35 @@ class DeepfakeDetectionError(VoiceShieldError):
     code = "deepfake_detection_failed"
 
 
+class SpeakerModelUnavailableError(VoiceShieldError):
+    """503 - The speaker recognition model could not be loaded."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    code = "speaker_model_unavailable"
+    detail = "Speaker recognition model is currently unavailable."
+
+
+class SpeakerInputError(VoiceShieldError):
+    """400 - Audio supplied to the speaker model is invalid."""
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    code = "speaker_input_error"
+
+
+class SpeakerVerificationError(VoiceShieldError):
+    """500 - Unexpected failure while generating/verifying a speaker embedding."""
+
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    code = "speaker_verification_failed"
+
+
+class SpeakerEmbeddingError(VoiceShieldError):
+    """500 - Invalid or incompatible stored embedding."""
+
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    code = "speaker_embedding_invalid"
+
+
 class ServiceUnavailableError(VoiceShieldError):
     """503 - Dependency (e.g. database) is unavailable."""
 

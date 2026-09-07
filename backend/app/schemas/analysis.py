@@ -41,6 +41,7 @@ class AnalysisStatusResponse(BaseModel):
 
     available: bool
     deepfake: bool
+    speaker: bool
     message: str
 
 

@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     still respond while the database comes online.
     """
     from app.database.database import init_db
-    from app.ml import deepfake_model_manager
+    from app.ml import deepfake_model_manager, speaker_verifier_manager
     from app.services.audio_service import (
         _ensure_processed_audio_dir,
         _ensure_upload_dir,
@@ -38,10 +38,11 @@ async def lifespan(app: FastAPI):
         except OSError as exc:
             logger.warning("Could not prepare storage directory: %s", exc)
 
-    # Load the deepfake model once, off the request path. The manager stays
-    # resident and reports its state accurately via /health; if loading
-    # fails later the API returns 503 instead of a fake prediction.
+    # Load both models once, off the request path. The managers stay
+    # resident and report their state accurately via /health; if loading
+    # fails later the API returns 503 instead of a fake result.
     deepfake_model_manager.load_in_background()
+    speaker_verifier_manager.load_in_background()
 
     yield
 

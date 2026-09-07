@@ -114,6 +114,11 @@ class AudioAnalysis(Base):
     )
     speaker_device: Mapped[str | None] = mapped_column(String(50), nullable=True)
     speaker_error: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    # Persist the profile used for verification so reports are stable.
+    reference_profile_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True
+    )
+    reference_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Risk fusion (filled by the Phase 6 risk engine). Stored as plain
     # strings so the forward migrations (VARCHAR) and create_all stay

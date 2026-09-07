@@ -1,5 +1,6 @@
 import { api, API_BASE_URL } from "./api";
 import type {
+  AnalysisDetails,
   AnalysisStatusResponse,
   AudioAnalysis,
   AudioListResponse,
@@ -84,6 +85,26 @@ export const audioService = {
   async get(analysisId: string): Promise<AudioAnalysis> {
     const response = await api.get<AudioAnalysis>(`/audio/${analysisId}`);
     return response.data;
+  },
+
+  /** Fetch the Phase 9 combined details payload for an analysis. */
+  async getDetails(analysisId: string): Promise<AnalysisDetails> {
+    const response = await api.get<AnalysisDetails>(`/analysis/${analysisId}`);
+    return response.data;
+  },
+
+  /** Absolute URL of the printable HTML report for an analysis. */
+  reportUrl(analysisId: string): string {
+    return `${API_BASE_URL}/analysis/${analysisId}/report`;
+  },
+
+  /** Fetch the printable HTML report for an analysis as text. */
+  async getReport(analysisId: string): Promise<string> {
+    const response = await fetch(this.reportUrl(analysisId), {
+      headers: { Accept: "text/html" },
+    });
+    if (!response.ok) throw new Error(`Report request failed (${response.status})`);
+    return response.text();
   },
 
   /** Delete an analysis record and its stored audio file. */

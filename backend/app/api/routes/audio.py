@@ -133,6 +133,8 @@ def get_audio(
         speaker_processing_time=record.speaker_processing_time,
         speaker_device=record.speaker_device,
         speaker_error=record.speaker_error,
+        reference_profile_id=record.reference_profile_id,
+        reference_name=record.reference_name,
         risk_status=record.risk_status,
         risk_score=record.risk_score,
         risk_level=record.risk_level,

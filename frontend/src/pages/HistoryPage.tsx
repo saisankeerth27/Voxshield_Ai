@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, FileUp, History as HistoryIcon, Mic, Trash2, TriangleAlert } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Eye, FileUp, History as HistoryIcon, Mic, Trash2, TriangleAlert } from "lucide-react";
 import { audioService } from "../services/audioService";
 import { getApiErrorMessage } from "../utils/apiError";
 import { formatFileSize, formatTimestamp } from "../utils/format";
@@ -208,14 +209,23 @@ export default function HistoryPage() {
                     />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleDelete(item.analysis_id)}
-                      disabled={deletingId === item.analysis_id}
-                      aria-label={`Delete ${item.filename}`}
-                      className="text-slate-500 transition-colors hover:text-red-400 disabled:opacity-40"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="inline-flex items-center gap-3">
+                      <Link
+                        to={`/analysis/${item.analysis_id}`}
+                        aria-label={`View details for ${item.filename}`}
+                        className="text-slate-500 transition-colors hover:text-emerald-400"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(item.analysis_id)}
+                        disabled={deletingId === item.analysis_id}
+                        aria-label={`Delete ${item.filename}`}
+                        className="text-slate-500 transition-colors hover:text-red-400 disabled:opacity-40"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

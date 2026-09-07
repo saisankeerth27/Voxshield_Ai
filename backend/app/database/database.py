@@ -80,6 +80,8 @@ def _apply_forward_migrations() -> None:
         "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS speaker_processing_time FLOAT",
         "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS speaker_device VARCHAR(50)",
         "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS speaker_error VARCHAR(2000)",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS reference_profile_id VARCHAR(36)",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS reference_name VARCHAR(255)",
         # Risk fusion results
         "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS risk_status VARCHAR(20)",
         "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS risk_score FLOAT",

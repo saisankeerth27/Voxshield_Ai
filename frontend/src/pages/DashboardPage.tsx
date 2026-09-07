@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   AudioLines,
   BrainCircuit,
+  FileText,
   Fingerprint,
   Gauge,
   History,
@@ -301,6 +302,13 @@ export default function DashboardPage() {
               >
                 <ScanLine className="h-4 w-4" />
                 View Analysis
+              </Link>
+              <Link
+                to={`/analysis/${latest.analysis_id}`}
+                className="ml-2 inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-emerald-500/40 hover:text-emerald-400"
+              >
+                <FileText className="h-4 w-4" />
+                Full Details
               </Link>
             </div>
           ) : (

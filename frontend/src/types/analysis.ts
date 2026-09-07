@@ -86,6 +86,8 @@ export interface AudioAnalysis {
   speaker_processing_time: number | null;
   speaker_device: string | null;
   speaker_error: string | null;
+  reference_profile_id: string | null;
+  reference_name: string | null;
   risk_status: RiskStatus | null;
   risk_score: number | null;
   risk_level: RiskLevel | null;
@@ -227,7 +229,7 @@ export interface RiskCalculateResponse {
   message: string;
 }
 
-export interface RiskResultResponse {
+export type RiskResultResponse = {
   analysis_id: string;
   status: AnalysisStatus;
   risk_status: RiskStatus | null;
@@ -237,4 +239,85 @@ export interface RiskResultResponse {
   recommendation: string | null;
   risk_processing_time: number | null;
   risk_engine_version: string | null;
+};
+
+// ── Phase 9: analysis details ────────────────────────────────────────
+
+export type AnalysisStageStatus =
+  | "not_started"
+  | "running"
+  | "completed"
+  | "failed";
+
+export interface StageStatus {
+  status: AnalysisStageStatus;
+  error: string | null;
+  message: string | null;
+}
+
+export interface AnalysisDetailsAudio {
+  filename: string;
+  file_size: number;
+  mime_type: string | null;
+  duration_seconds: number | null;
+  original_sample_rate: number | null;
+  original_channels: number | null;
+  processed_sample_rate: number | null;
+  processed_channels: number | null;
+  processed_duration_seconds: number | null;
+}
+
+export interface AnalysisDetailsDeepfake {
+  status: AnalysisStageStatus;
+  ai_probability: number | null;
+  real_probability: number | null;
+  label: string | null;
+  model: string | null;
+  model_version: string | null;
+  processing_time: number | null;
+  device: string | null;
+  error: string | null;
+}
+
+export interface AnalysisDetailsSpeaker {
+  status: AnalysisStageStatus;
+  similarity: number | null;
+  verified: boolean | null;
+  model: string | null;
+  model_version: string | null;
+  processing_time: number | null;
+  device: string | null;
+  reference_name: string | null;
+  reference_profile_id: string | null;
+  error: string | null;
+}
+
+export interface AnalysisDetailsRisk {
+  status: AnalysisStageStatus;
+  score: number | null;
+  level: RiskLevel | null;
+  explanation: string | null;
+  recommendation: string | null;
+  processing_time: number | null;
+  engine_version: string | null;
+}
+
+export interface AnalysisDetails {
+  analysis_id: string;
+  status: AnalysisStatus;
+  source: AudioSource;
+  created_at: string;
+  updated_at: string;
+  audio: AnalysisDetailsAudio;
+  deepfake: AnalysisDetailsDeepfake;
+  speaker: AnalysisDetailsSpeaker;
+  risk: AnalysisDetailsRisk;
+  timeline: {
+    uploaded: StageStatus;
+    preprocessed: StageStatus;
+    deepfake: StageStatus;
+    speaker: StageStatus;
+    risk: StageStatus;
+    completed: StageStatus;
+  };
 }

@@ -262,6 +262,8 @@ def run_speaker_verification(
     record.speaker_processing_time = round(processing_time, 3)
     record.speaker_device = result.device
     record.speaker_error = None
+    record.reference_profile_id = str(profile.id)
+    record.reference_name = profile.name
     record.status = AudioAnalysisStatus.SPEAKER_ANALYZED
     _commit_record(db, record, "Unable to store the speaker verification result.")
 

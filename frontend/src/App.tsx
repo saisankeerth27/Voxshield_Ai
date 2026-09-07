@@ -5,6 +5,8 @@ import DashboardPage from "./pages/DashboardPage";
 import AnalyzePage from "./pages/AnalyzePage";
 import HistoryPage from "./pages/HistoryPage";
 import ProfilePage from "./pages/ProfilePage";
+import AnalysisDetailsPage from "./pages/AnalysisDetailsPage";
+import ReportPage from "./pages/ReportPage";
 
 /**
  * Application routes.
@@ -15,6 +17,8 @@ import ProfilePage from "./pages/ProfilePage";
  *   /analyze    Analysis workspace
  *   /history    Detection history
  *   /profile    Voice profile
+ *   /analysis/:analysisId             Analysis details page
+ *   /analysis/:analysisId/report      Printable report (standalone)
  */
 export default function App() {
   return (
@@ -26,7 +30,9 @@ export default function App() {
           <Route path="/analyze" element={<AnalyzePage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/analysis/:analysisId" element={<AnalysisDetailsPage />} />
         </Route>
+        <Route path="/analysis/:analysisId/report" element={<ReportPage />} />
       </Routes>
     </BrowserRouter>
   );

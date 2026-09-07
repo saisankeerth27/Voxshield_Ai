@@ -56,6 +56,8 @@ class AudioAnalysisResponse(BaseModel):
     speaker_processing_time: float | None = None
     speaker_device: str | None = None
     speaker_error: str | None = None
+    reference_profile_id: str | None = None
+    reference_name: str | None = None
     risk_status: str | None = None
     risk_score: float | None = None
     risk_level: str | None = None

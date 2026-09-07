@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import List
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -72,6 +72,34 @@ class Settings(BaseSettings):
     # Audio must contain at least this much speech (16 kHz) to generate a
     # stable speaker embedding (both for profiles and verification).
     min_speaker_duration_seconds: float = 1.0
+
+    # Risk fusion engine (Phase 6 - deterministic heuristic, NOT ML)
+    # Weights control how each signal contributes to the overall risk score.
+    # deepfake_weight + speaker_weight should sum to 1.0.
+    deepfake_weight: float = 0.60
+    speaker_weight: float = 0.40
+    # Risk-level thresholds on the [0.0, 1.0] score range.
+    risk_low_max: float = 0.39
+    risk_medium_max: float = 0.69
+    # Threshold for "strong" vs "moderate" speaker-similarity explanation text.
+    speaker_similarity_high: float = 0.50
+    risk_engine_version: str = "1.0"
+
+    @model_validator(mode="after")
+    def _validate_risk_weights(self) -> "Settings":
+        total = self.deepfake_weight + self.speaker_weight
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError(
+                f"deepfake_weight ({self.deepfake_weight}) + "
+                f"speaker_weight ({self.speaker_weight}) must sum to 1.0, "
+                f"got {total}"
+            )
+        if not (0.0 <= self.risk_low_max < self.risk_medium_max <= 1.0):
+            raise ValueError(
+                "risk thresholds must satisfy 0 <= risk_low_max < "
+                "risk_medium_max <= 1"
+            )
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

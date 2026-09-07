@@ -54,6 +54,13 @@ class AudioAnalysisResponse(BaseModel):
     speaker_processing_time: float | None = None
     speaker_device: str | None = None
     speaker_error: str | None = None
+    risk_status: str | None = None
+    risk_score: float | None = None
+    risk_level: str | None = None
+    risk_explanation: str | None = None
+    risk_recommendation: str | None = None
+    risk_processing_time: float | None = None
+    risk_engine_version: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -98,6 +105,9 @@ class AudioListItemResponse(BaseModel):
     speaker_verification_status: str | None = None
     speaker_similarity: float | None = None
     speaker_verified: bool | None = None
+    risk_status: str | None = None
+    risk_score: float | None = None
+    risk_level: str | None = None
     created_at: datetime
 
 

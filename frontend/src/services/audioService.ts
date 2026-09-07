@@ -14,6 +14,8 @@ import type {
   SpeakerProfile,
   SpeakerResultResponse,
   SpeakerVerifyResponse,
+  RiskCalculateResponse,
+  RiskResultResponse,
 } from "../types/analysis";
 
 /**
@@ -172,6 +174,27 @@ export const audioService = {
   async getSpeakerResult(analysisId: string): Promise<SpeakerResultResponse> {
     const response = await api.get<SpeakerResultResponse>(
       `/analysis/${analysisId}/speaker`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Calculate risk from the STORED deepfake + speaker results. Only the
+   * analysis id is sent; inputs are read server-side, never from the client.
+   */
+  async runRisk(analysisId: string): Promise<RiskCalculateResponse> {
+    const response = await api.post<RiskCalculateResponse>(
+      `/analysis/${analysisId}/risk`,
+      undefined,
+      { timeout: 60000 },
+    );
+    return response.data;
+  },
+
+  /** Fetch the stored risk result without recomputation. */
+  async getRiskResult(analysisId: string): Promise<RiskResultResponse> {
+    const response = await api.get<RiskResultResponse>(
+      `/analysis/${analysisId}/risk`,
     );
     return response.data;
   },

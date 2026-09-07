@@ -35,11 +35,18 @@ function formatSimilarity(value: number | null): string {
   return value.toFixed(4);
 }
 
+function formatRiskScore(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "Not analyzed";
+  return value.toFixed(2);
+}
+
 function MetricSection({ analysis }: { analysis: AudioAnalysis | null }) {
   const ai = analysis?.ai_probability ?? null;
   const real = analysis?.real_probability ?? null;
   const similarity = analysis?.speaker_similarity ?? null;
   const verified = analysis?.speaker_verified ?? null;
+  const riskScore = analysis?.risk_score ?? null;
+  const riskLevel = analysis?.risk_level ?? null;
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <MetricCard
@@ -72,7 +79,20 @@ function MetricSection({ analysis }: { analysis: AudioAnalysis | null }) {
       />
       <MetricCard
         label="Risk Score"
-        value="Not analyzed"
+        value={
+          riskScore === null
+            ? "Not analyzed"
+            : `${formatRiskScore(riskScore)} (${riskLevel ?? "—"})`
+        }
+        status={
+          riskScore === null
+            ? "idle"
+            : riskLevel === "HIGH"
+              ? "danger"
+              : riskLevel === "MEDIUM"
+                ? "warn"
+                : "ok"
+        }
         icon={<Gauge className="h-5 w-5" />}
       />
     </div>
@@ -109,6 +129,7 @@ function statusVariant(status: string): "ok" | "warn" | "danger" | "idle" {
     case "COMPLETED":
     case "DEEPFAKE_ANALYZED":
     case "SPEAKER_ANALYZED":
+    case "RISK_CALCULATED":
       return "ok";
     case "FAILED":
       return "danger";
@@ -246,6 +267,20 @@ export default function DashboardPage() {
                   </span>
                 </p>
               ) : null}
+              {latest.risk_level ? (
+                <p
+                  className={`mt-1 ${
+                    latest.risk_level === "HIGH"
+                      ? "text-red-400"
+                      : latest.risk_level === "MEDIUM"
+                        ? "text-amber-400"
+                        : "text-emerald-400"
+                  }`}
+                >
+                  Risk: {latest.risk_level} · score{" "}
+                  {formatRiskScore(latest.risk_score)}
+                </p>
+              ) : null}
             </div>
           ) : (
             <p className="text-sm text-slate-400">
@@ -254,10 +289,50 @@ export default function DashboardPage() {
           )}
         </SectionCard>
 
-        <SectionCard icon={ShieldAlert} title="Risk Status" action={<StatusBadge label="Idle" variant="idle" />}>
-          <p className="text-sm text-slate-400">
-            Risk assessment will appear here after audio is analyzed.
-          </p>
+        <SectionCard
+          icon={ShieldAlert}
+          title="Risk Status"
+          action={
+            <StatusBadge
+              label={latest?.risk_level ?? "Idle"}
+              variant={
+                latest?.risk_level === "HIGH"
+                  ? "danger"
+                  : latest?.risk_level === "MEDIUM"
+                    ? "warn"
+                    : latest?.risk_level === "LOW"
+                      ? "ok"
+                      : "idle"
+              }
+            />
+          }
+        >
+          {latest?.risk_level ? (
+            <div className="space-y-2 text-sm">
+              <p className="text-slate-300">
+                Risk level:{" "}
+                <span className="font-medium text-slate-200">
+                  {latest.risk_level}
+                </span>{" "}
+                · <span className="text-slate-400">score</span>{" "}
+                <span className="font-mono text-slate-200">
+                  {formatRiskScore(latest.risk_score)}
+                </span>
+              </p>
+              {latest.risk_explanation ? (
+                <p className="text-slate-400">{latest.risk_explanation}</p>
+              ) : null}
+              <p className="pt-1 text-xs text-slate-500">
+                Deterministic MVP heuristic combining the deepfake probability
+                and speaker similarity — not a validated probability of attack.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">
+              Risk assessment appears here after deepfake detection and speaker
+              verification are completed.
+            </p>
+          )}
         </SectionCard>
 
         <SectionCard icon={AudioLines} title="Audio Visualization">
@@ -315,8 +390,12 @@ export default function DashboardPage() {
               Speaker verification: Operational
             </li>
             <li className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              Risk fusion engine: Operational
+            </li>
+            <li className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-slate-600" />
-              Risk fusion + alerts: Pending (later phase)
+              Alerts + notifications: Pending (later phase)
             </li>
           </ul>
         </SectionCard>

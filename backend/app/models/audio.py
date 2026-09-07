@@ -105,6 +105,25 @@ class AudioAnalysis(Base):
     speaker_device: Mapped[str | None] = mapped_column(String(50), nullable=True)
     speaker_error: Mapped[str | None] = mapped_column(String(2000), nullable=True)
 
+    # Risk fusion (filled by the Phase 6 risk engine). Stored as plain
+    # strings so the forward migrations (VARCHAR) and create_all stay
+    # consistent across PostgreSQL and SQLite.
+    risk_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    risk_level: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    risk_explanation: Mapped[str | None] = mapped_column(
+        String(2000), nullable=True
+    )
+    risk_recommendation: Mapped[str | None] = mapped_column(
+        String(2000), nullable=True
+    )
+    risk_processing_time: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )
+    risk_engine_version: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

@@ -8,6 +8,7 @@ export type AnalysisStatus =
   | "COMPLETED"
   | "DEEPFAKE_ANALYZED"
   | "SPEAKER_ANALYZED"
+  | "RISK_CALCULATED"
   | "FAILED";
 
 export type SpeakerVerificationStatus =
@@ -15,6 +16,8 @@ export type SpeakerVerificationStatus =
   | "PROCESSING"
   | "VERIFIED"
   | "FAILED";
+
+export type RiskStatus = "PENDING" | "PROCESSING" | "CALCULATED" | "FAILED";
 
 export const MAX_UPLOAD_SIZE_MB = 25;
 export const ALLOWED_EXTENSIONS = ["wav", "mp3", "m4a", "ogg"] as const;
@@ -79,6 +82,13 @@ export interface AudioAnalysis {
   speaker_processing_time: number | null;
   speaker_device: string | null;
   speaker_error: string | null;
+  risk_status: RiskStatus | null;
+  risk_score: number | null;
+  risk_level: RiskLevel | null;
+  risk_explanation: string | null;
+  risk_recommendation: string | null;
+  risk_processing_time: number | null;
+  risk_engine_version: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -93,6 +103,9 @@ export interface AudioListItem {
   speaker_verification_status?: SpeakerVerificationStatus | null;
   speaker_similarity?: number | null;
   speaker_verified?: boolean | null;
+  risk_status?: RiskStatus | null;
+  risk_score?: number | null;
+  risk_level?: RiskLevel | null;
   created_at: string;
 }
 
@@ -194,4 +207,29 @@ export interface SpeakerResultResponse {
   speaker_error: string | null;
   reference_profile_id: string | null;
   reference_name: string | null;
+}
+
+export interface RiskCalculateResponse {
+  analysis_id: string;
+  status: AnalysisStatus;
+  risk_status: RiskStatus;
+  risk_score: number | null;
+  risk_level: RiskLevel | null;
+  explanation: string | null;
+  recommendation: string | null;
+  risk_processing_time: number | null;
+  risk_engine_version: string | null;
+  message: string;
+}
+
+export interface RiskResultResponse {
+  analysis_id: string;
+  status: AnalysisStatus;
+  risk_status: RiskStatus | null;
+  risk_score: number | null;
+  risk_level: RiskLevel | null;
+  explanation: string | null;
+  recommendation: string | null;
+  risk_processing_time: number | null;
+  risk_engine_version: string | null;
 }

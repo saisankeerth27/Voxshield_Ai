@@ -13,6 +13,7 @@ function statusVariant(status: string): "ok" | "warn" | "danger" | "idle" {
     case "COMPLETED":
     case "DEEPFAKE_ANALYZED":
     case "SPEAKER_ANALYZED":
+    case "RISK_CALCULATED":
       return "ok";
     case "FAILED":
       return "danger";
@@ -35,6 +36,13 @@ function formatSimilarity(value: number | null | undefined): string {
     return "—";
   }
   return value.toFixed(4);
+}
+
+function formatRiskScore(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "—";
+  }
+  return value.toFixed(2);
 }
 
 export default function HistoryPage() {
@@ -123,6 +131,7 @@ export default function HistoryPage() {
                 <th className="px-4 py-3 font-medium">Uploaded</th>
                 <th className="px-4 py-3 font-medium">AI Prob.</th>
                 <th className="px-4 py-3 font-medium">Speaker</th>
+                <th className="px-4 py-3 font-medium">Risk</th>
                 <th className="px-4 py-3 font-medium">Status</th>
                 <th className="px-4 py-3 text-right font-medium">Actions</th>
               </tr>
@@ -156,6 +165,23 @@ export default function HistoryPage() {
                         }
                       >
                         {formatSimilarity(item.speaker_similarity)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-600">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {item.risk_level ? (
+                      <span
+                        className={
+                          item.risk_level === "HIGH"
+                            ? "text-red-400"
+                            : item.risk_level === "MEDIUM"
+                              ? "text-amber-400"
+                              : "text-emerald-400"
+                        }
+                      >
+                        {item.risk_level} · {formatRiskScore(item.risk_score)}
                       </span>
                     ) : (
                       <span className="text-slate-600">—</span>

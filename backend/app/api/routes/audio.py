@@ -64,6 +64,9 @@ def list_audio(
             speaker_verification_status=record.speaker_verification_status,
             speaker_similarity=record.speaker_similarity,
             speaker_verified=record.speaker_verified,
+            risk_status=record.risk_status,
+            risk_score=record.risk_score,
+            risk_level=record.risk_level,
             created_at=record.created_at,
         )
         for record in records
@@ -111,6 +114,13 @@ def get_audio(
         speaker_processing_time=record.speaker_processing_time,
         speaker_device=record.speaker_device,
         speaker_error=record.speaker_error,
+        risk_status=record.risk_status,
+        risk_score=record.risk_score,
+        risk_level=record.risk_level,
+        risk_explanation=record.risk_explanation,
+        risk_recommendation=record.risk_recommendation,
+        risk_processing_time=record.risk_processing_time,
+        risk_engine_version=record.risk_engine_version,
         created_at=record.created_at,
         updated_at=record.updated_at,
     )

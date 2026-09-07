@@ -131,6 +131,13 @@ class SpeakerEmbeddingError(VoiceShieldError):
     code = "speaker_embedding_invalid"
 
 
+class IncompleteAnalysisError(VoiceShieldError):
+    """400 - Required analysis results are missing for the requested operation."""
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    code = "incomplete_analysis"
+
+
 class ServiceUnavailableError(VoiceShieldError):
     """503 - Dependency (e.g. database) is unavailable."""
 

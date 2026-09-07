@@ -17,8 +17,9 @@ from app.schemas.analysis import (
     DeepfakeResultResponse,
     DeepfakeRunResponse,
 )
+from app.schemas.risk import RiskCalculateResponse, RiskResultResponse
 from app.schemas.speaker import SpeakerResultResponse, SpeakerVerifyResponse
-from app.services import analysis_service, speaker_service
+from app.services import analysis_service, risk_service, speaker_service
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -142,4 +143,55 @@ def get_speaker_result(
         speaker_error=record.speaker_error,
         reference_profile_id=str(active.id) if active else None,
         reference_name=active.name if active else None,
+    )
+
+
+@router.post(
+    "/{analysis_id}/risk",
+    response_model=RiskCalculateResponse,
+    status_code=status.HTTP_200_OK,
+)
+def run_risk_analysis(
+    analysis_id: uuid.UUID, db: Session = Depends(get_db)
+) -> RiskCalculateResponse:
+    """Calculate risk from the STORED deepfake + speaker results.
+
+    The frontend supplies only the analysis id; the backing values are read
+    from the database so the client cannot manipulate the risk calculation.
+    """
+    record = risk_service.run_risk_analysis(analysis_id, db)
+    return RiskCalculateResponse(
+        analysis_id=str(record.id),
+        status=record.status,
+        risk_status=record.risk_status,
+        risk_score=record.risk_score,
+        risk_level=record.risk_level,
+        explanation=record.risk_explanation,
+        recommendation=record.risk_recommendation,
+        risk_processing_time=record.risk_processing_time,
+        risk_engine_version=record.risk_engine_version,
+        message="Risk assessment completed successfully",
+    )
+
+
+@router.get(
+    "/{analysis_id}/risk",
+    response_model=RiskResultResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_risk_result(
+    analysis_id: uuid.UUID, db: Session = Depends(get_db)
+) -> RiskResultResponse:
+    """Return the stored risk result without recomputation."""
+    record = risk_service.get_risk_result(analysis_id, db)
+    return RiskResultResponse(
+        analysis_id=str(record.id),
+        status=record.status,
+        risk_status=record.risk_status,
+        risk_score=record.risk_score,
+        risk_level=record.risk_level,
+        explanation=record.risk_explanation,
+        recommendation=record.risk_recommendation,
+        risk_processing_time=record.risk_processing_time,
+        risk_engine_version=record.risk_engine_version,
     )

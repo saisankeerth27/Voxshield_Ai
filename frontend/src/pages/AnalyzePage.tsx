@@ -22,9 +22,11 @@ import AudioWaveform from "../components/AudioWaveform";
 import SpectrogramViewer from "../components/SpectrogramViewer";
 import StatusBadge from "../components/StatusBadge";
 import FileDropzone from "../components/FileDropzone";
+import RiskAssessmentCard from "../components/RiskAssessmentCard";
 import type {
   AudioPreprocessResponse,
   DeepfakeRunResponse,
+  RiskCalculateResponse,
   SpeakerProfileStatusResponse,
   SpeakerVerifyResponse,
 } from "../types/analysis";
@@ -80,6 +82,12 @@ interface VerifyState {
   profile: SpeakerProfileStatusResponse | null;
 }
 
+interface RiskState {
+  phase: "idle" | "calculating" | "done" | "error";
+  result: RiskCalculateResponse | null;
+  error: string | null;
+}
+
 const INITIAL_PREPARE: PrepareState = {
   phase: "idle",
   result: null,
@@ -97,6 +105,12 @@ const INITIAL_VERIFY: VerifyState = {
   result: null,
   error: null,
   profile: null,
+};
+
+const INITIAL_RISK: RiskState = {
+  phase: "idle",
+  result: null,
+  error: null,
 };
 
 function formatSampleRate(rate: number | null): string {
@@ -247,6 +261,8 @@ function AnalysisProgress({
   detected,
   verifying,
   verified,
+  calculating,
+  calculated,
 }: {
   uploaded: boolean;
   preparing: boolean;
@@ -255,6 +271,8 @@ function AnalysisProgress({
   detected: boolean;
   verifying: boolean;
   verified: boolean;
+  calculating: boolean;
+  calculated: boolean;
 }) {
   const steps = [
     { label: "Upload audio", done: uploaded, active: false },
@@ -264,6 +282,11 @@ function AnalysisProgress({
       label: "Speaker verification",
       done: verified,
       active: verifying,
+    },
+    {
+      label: "Risk assessment",
+      done: calculated,
+      active: calculating,
     },
   ];
   return (
@@ -301,6 +324,7 @@ export default function AnalyzePage() {
   const [prepare, setPrepare] = useState<PrepareState>(INITIAL_PREPARE);
   const [detect, setDetect] = useState<DetectState>(INITIAL_DETECT);
   const [verify, setVerify] = useState<VerifyState>(INITIAL_VERIFY);
+  const [risk, setRisk] = useState<RiskState>(INITIAL_RISK);
 
   const uploadError = upload.state === "ERROR" ? upload.error : null;
 
@@ -308,6 +332,7 @@ export default function AnalyzePage() {
     setPrepare(INITIAL_PREPARE);
     setDetect(INITIAL_DETECT);
     setVerify(INITIAL_VERIFY);
+    setRisk(INITIAL_RISK);
   }, [upload.uploadResult?.analysis_id]);
 
   const runPreprocess = async () => {
@@ -365,6 +390,19 @@ export default function AnalyzePage() {
     }
   };
 
+  const runRisk = async () => {
+    if (!upload.uploadResult) return;
+    const analysisId = upload.uploadResult.analysis_id;
+    setRisk({ phase: "calculating", result: null, error: null });
+    try {
+      const result = await audioService.runRisk(analysisId);
+      setRisk({ phase: "done", result, error: null });
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Risk assessment failed");
+      setRisk({ phase: "error", result: null, error: message });
+    }
+  };
+
   useEffect(() => {
     if (upload.uploadResult && prepare.phase === "done") {
       void refreshProfileStatus();
@@ -419,6 +457,8 @@ export default function AnalyzePage() {
             detected={detect.phase === "done"}
             verifying={verify.phase === "verifying"}
             verified={verify.phase === "done"}
+            calculating={risk.phase === "calculating"}
+            calculated={risk.phase === "done"}
           />
         </div>
       ) : null}
@@ -843,6 +883,23 @@ export default function AnalyzePage() {
                     </div>
                   </div>
                 ) : null}
+              </div>
+            ) : null}
+
+            {/* Risk assessment step */}
+            {upload.state === "UPLOADED" &&
+            upload.uploadResult &&
+            prepare.phase === "done" ? (
+              <div className="mt-4">
+                <RiskAssessmentCard
+                  phase={risk.phase}
+                  result={risk.result}
+                  error={risk.error}
+                  disabled={
+                    detect.phase !== "done" || verify.phase !== "done"
+                  }
+                  onCalculate={() => void runRisk()}
+                />
               </div>
             ) : null}
 

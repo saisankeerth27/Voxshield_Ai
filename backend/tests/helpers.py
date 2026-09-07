@@ -148,6 +148,50 @@ def make_mp3_bytes(duration_seconds: float = 2.0, sample_rate: int = 16000) -> b
     return proc.stdout
 
 
+def make_webm_bytes(duration_seconds: float = 2.0, sample_rate: int = 16000) -> bytes:
+    """Encode a sine wave to WebM/Opus via FFmpeg, skipping if unavailable.
+
+    Mirrors the browser's ``MediaRecorder`` output so the microphone upload
+    path (WebM/Opus -> FFmpeg -> WAV) is exercised end-to-end in tests.
+    """
+    import subprocess
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        try:
+            import imageio_ffmpeg
+
+            ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            pytest.skip("FFmpeg is not available for WebM test fixtures.")
+
+    wav_path = write_wav_temp(duration_seconds, sample_rate, "_webm_src")
+    proc = subprocess.run(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-y",
+            "-i",
+            str(wav_path),
+            "-c:a",
+            "libopus",
+            "-f",
+            "webm",
+            "-",
+        ],
+        capture_output=True,
+        timeout=60,
+    )
+    if proc.returncode != 0 or not proc.stdout:
+        pytest.skip("FFmpeg could not build a WebM fixture: " + proc.stderr.decode())
+
+    import os
+
+    os.unlink(wav_path)
+    return proc.stdout
+
+
 def write_wav_temp(
     duration_seconds: float = 2.0,
     sample_rate: int = 16000,

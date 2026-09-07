@@ -1,5 +1,7 @@
 export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 
+export type AudioSource = "UPLOAD" | "MICROPHONE";
+
 export type AnalysisStatus =
   | "UPLOADED"
   | "PREPROCESSING"
@@ -20,7 +22,7 @@ export type SpeakerVerificationStatus =
 export type RiskStatus = "PENDING" | "PROCESSING" | "CALCULATED" | "FAILED";
 
 export const MAX_UPLOAD_SIZE_MB = 25;
-export const ALLOWED_EXTENSIONS = ["wav", "mp3", "m4a", "ogg"] as const;
+export const ALLOWED_EXTENSIONS = ["wav", "mp3", "m4a", "ogg", "webm"] as const;
 
 export interface AudioUploadResponse {
   success: boolean;
@@ -28,6 +30,7 @@ export interface AudioUploadResponse {
   filename: string;
   status: AnalysisStatus;
   message: string;
+  source: AudioSource;
 }
 
 export interface AudioMetadataBrief {
@@ -55,6 +58,7 @@ export interface PreprocessStatusResponse {
 export interface AudioAnalysis {
   analysis_id: string;
   filename: string;
+  source: AudioSource;
   file_size: number;
   mime_type: string | null;
   duration_seconds: number | null;
@@ -96,6 +100,7 @@ export interface AudioAnalysis {
 export interface AudioListItem {
   analysis_id: string;
   filename: string;
+  source?: AudioSource;
   file_size: number;
   status: AnalysisStatus;
   ai_probability?: number | null;

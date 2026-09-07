@@ -20,6 +20,7 @@ class AudioUploadResponse(BaseModel):
     filename: str
     status: AudioAnalysisStatus
     message: str
+    source: str = "UPLOAD"
 
 
 class AudioAnalysisResponse(BaseModel):
@@ -27,6 +28,7 @@ class AudioAnalysisResponse(BaseModel):
 
     analysis_id: str
     filename: str
+    source: str = "UPLOAD"
     file_size: int
     mime_type: str | None
     duration_seconds: float | None
@@ -98,6 +100,7 @@ class AudioListItemResponse(BaseModel):
 
     analysis_id: str
     filename: str
+    source: str = "UPLOAD"
     file_size: int
     status: str
     ai_probability: float | None = None

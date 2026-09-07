@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, History as HistoryIcon, Trash2, TriangleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileUp, History as HistoryIcon, Mic, Trash2, TriangleAlert } from "lucide-react";
 import { audioService } from "../services/audioService";
 import { getApiErrorMessage } from "../utils/apiError";
 import { formatFileSize, formatTimestamp } from "../utils/format";
@@ -129,6 +129,7 @@ export default function HistoryPage() {
                 <th className="px-4 py-3 font-medium">Filename</th>
                 <th className="px-4 py-3 font-medium">Size</th>
                 <th className="px-4 py-3 font-medium">Uploaded</th>
+                <th className="px-4 py-3 font-medium">Source</th>
                 <th className="px-4 py-3 font-medium">AI Prob.</th>
                 <th className="px-4 py-3 font-medium">Speaker</th>
                 <th className="px-4 py-3 font-medium">Risk</th>
@@ -153,6 +154,19 @@ export default function HistoryPage() {
                   </td>
                   <td className="px-4 py-3 text-slate-400">
                     {formatTimestamp(item.created_at)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {item.source === "MICROPHONE" ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-300">
+                        <Mic className="h-3.5 w-3.5 text-violet-400" />
+                        Mic
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
+                        <FileUp className="h-3.5 w-3.5" />
+                        Upload
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 font-mono text-slate-300">
                     {formatProbability(item.ai_probability)}

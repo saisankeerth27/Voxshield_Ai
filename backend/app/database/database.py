@@ -54,6 +54,7 @@ def _apply_forward_migrations() -> None:
     in-memory test tables are already created by ``create_all``.
     """
     statements = [
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS source VARCHAR(20) DEFAULT 'UPLOAD'",
         "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS original_sample_rate INTEGER",
         "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS original_channels INTEGER",
         "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS processed_sample_rate INTEGER",

@@ -74,7 +74,7 @@ export default function FileDropzone({
         <input
           ref={inputRef}
           type="file"
-          accept=".wav,.mp3,.m4a,.ogg,audio/wav,audio/mpeg,audio/mp4,audio/x-m4a,audio/ogg"
+          accept=".wav,.mp3,.m4a,.ogg,.webm,audio/wav,audio/mpeg,audio/mp4,audio/x-m4a,audio/ogg,audio/webm"
           className="hidden"
           disabled={disabled}
           onChange={(e) => {

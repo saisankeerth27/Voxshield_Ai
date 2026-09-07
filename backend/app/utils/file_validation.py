@@ -7,7 +7,7 @@ API errors so routes stay thin and messages stay consistent.
 
 from app.core.exceptions import BadRequestError, FileTooLargeError
 
-ALLOWED_AUDIO_EXTENSIONS = {"wav", "mp3", "m4a", "ogg"}
+ALLOWED_AUDIO_EXTENSIONS = {"wav", "mp3", "m4a", "ogg", "webm"}
 
 MIME_TO_EXTENSION: dict[str, str] = {
     "audio/wav": "wav",
@@ -18,6 +18,7 @@ MIME_TO_EXTENSION: dict[str, str] = {
     "audio/x-m4a": "m4a",
     "audio/ogg": "ogg",
     "audio/opus": "ogg",
+    "audio/webm": "webm",
 }
 
 

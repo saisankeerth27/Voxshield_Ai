@@ -1,5 +1,6 @@
 import { ShieldCheck } from "lucide-react";
 import RiskIndicator from "./RiskIndicator";
+import type { AudioSource } from "../types/analysis";
 
 interface RiskResultCardProps {
   aiProbability: number | null;
@@ -10,6 +11,8 @@ interface RiskResultCardProps {
   recommendation: string | null;
   /** Total analysis time in seconds across all pipeline steps. */
   analysisTimeSeconds: number | null;
+  /** Origin of the analyzed audio (UPLOAD or MICROPHONE). */
+  source?: AudioSource | null;
 }
 
 function formatPercent(value: number | null | undefined): string {
@@ -57,6 +60,7 @@ export default function RiskResultCard({
   explanation,
   recommendation,
   analysisTimeSeconds,
+  source,
 }: RiskResultCardProps) {
   return (
     <div className="rounded-xl border border-white/5 bg-surface-light p-6">
@@ -106,6 +110,12 @@ export default function RiskResultCard({
       ) : null}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3">
+        <p className="text-xs text-slate-500">
+          Audio source:{" "}
+          <span className="font-medium text-slate-300">
+            {source === "MICROPHONE" ? "Microphone" : source === "UPLOAD" ? "Upload" : "—"}
+          </span>
+        </p>
         <p className="text-xs text-slate-500">
           Analysis time:{" "}
           <span className="font-mono text-slate-300">

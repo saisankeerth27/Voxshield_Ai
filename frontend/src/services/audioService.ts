@@ -4,6 +4,7 @@ import type {
   AudioAnalysis,
   AudioListResponse,
   AudioPreprocessResponse,
+  AudioSource,
   AudioUploadResponse,
   DeepfakeResultResponse,
   DeepfakeRunResponse,
@@ -27,15 +28,19 @@ import type {
  */
 export const audioService = {
   /**
-   * Upload an audio file. ``onProgress`` receives a 0–1 proportion that can
-   * be rendered as a progress bar.
+   * Upload an audio file. ``source`` records where it came from
+   * (UPLOAD or MICROPHONE) so history can tell them apart; it is stored
+   * alongside the analysis without a separate table. ``onProgress``
+   * receives a 0–1 proportion that can be rendered as a progress bar.
    */
   async upload(
     file: File,
+    source: AudioSource = "UPLOAD",
     onProgress?: (progress: number) => void,
   ): Promise<AudioUploadResponse> {
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("source", source);
     const response = await api.post<AudioUploadResponse>(
       "/audio/upload",
       formData,

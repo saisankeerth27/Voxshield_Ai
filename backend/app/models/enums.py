@@ -49,3 +49,10 @@ class RiskStatus(str, enum.Enum):
     PROCESSING = "PROCESSING"
     CALCULATED = "CALCULATED"
     FAILED = "FAILED"
+
+
+class AudioSource(str, enum.Enum):
+    """Origin of an analysis's audio, used for history filtering/display."""
+
+    UPLOAD = "UPLOAD"
+    MICROPHONE = "MICROPHONE"

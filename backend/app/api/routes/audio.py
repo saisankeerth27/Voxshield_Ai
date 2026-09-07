@@ -6,11 +6,13 @@ only translate HTTP requests into service calls and responses.
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import BadRequestError
 from app.database.database import get_db
+from app.models.enums import AudioSource
 from app.schemas.audio import (
     AudioAnalysisResponse,
     AudioDeleteResponse,
@@ -32,16 +34,31 @@ router = APIRouter(prefix="/audio", tags=["audio"])
     status_code=status.HTTP_200_OK,
 )
 def upload_audio(
-    file: UploadFile = File(...), db: Session = Depends(get_db)
+    file: UploadFile = File(...),
+    source: str = Form(default="UPLOAD"),
+    db: Session = Depends(get_db),
 ) -> AudioUploadResponse:
-    """Upload, validate, store, and record an audio file."""
-    record = audio_service.save_audio_upload(file, db)
+    """Upload, validate, store, and record an audio file.
+
+    ``source`` (UPLOAD or MICROPHONE) records where the audio came from so
+    the history page can distinguish file uploads from microphone
+    recordings without a separate storage table.
+    """
+    try:
+        source_enum = AudioSource(source.strip().upper())
+    except ValueError:
+        raise BadRequestError(
+            "Invalid source. Expected 'UPLOAD' or 'MICROPHONE'."
+        ) from None
+
+    record = audio_service.save_audio_upload(file, db, source=source_enum)
     return AudioUploadResponse(
         success=True,
         analysis_id=str(record.id),
         filename=record.original_filename,
         status=record.status,
         message="Audio uploaded successfully",
+        source=record.source,
     )
 
 
@@ -57,6 +74,7 @@ def list_audio(
         AudioListItemResponse(
             analysis_id=str(record.id),
             filename=record.original_filename,
+            source=record.source,
             file_size=record.file_size,
             status=record.status.value,
             ai_probability=record.ai_probability,
@@ -87,6 +105,7 @@ def get_audio(
     return AudioAnalysisResponse(
         analysis_id=str(record.id),
         filename=record.original_filename,
+        source=record.source,
         file_size=record.file_size,
         mime_type=record.mime_type,
         duration_seconds=record.duration_seconds,

@@ -15,7 +15,7 @@ const mimeToExtension: Record<string, string> = {
   "audio/x-m4a": "m4a",
   "audio/ogg": "ogg",
   "audio/opus": "ogg",
-  "audio/webm": "ogg",
+  "audio/webm": "webm",
 };
 
 /**
@@ -54,7 +54,9 @@ export function validateAudioFile(file: File): AudioValidationResult {
 
 /**
  * Derive a human-readable format label from a MIME type for display.
+ * Codecs parameters are stripped so "audio/webm;codecs=opus" -> "webm".
  */
 export function formatLabelFromMime(mime: string): string {
-  return mimeToExtension[mime] ?? "audio";
+  const base = mime.split(";")[0]?.trim().toLowerCase() ?? "";
+  return mimeToExtension[base] ?? "audio";
 }

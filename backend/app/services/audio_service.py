@@ -28,7 +28,7 @@ from app.core.exceptions import (
     VoiceShieldError,
 )
 from app.models.audio import AudioAnalysis
-from app.models.enums import AudioAnalysisStatus
+from app.models.enums import AudioAnalysisStatus, AudioSource
 from app.utils.audio_metadata import detect_audio_duration
 from app.utils.file_validation import validate_audio_upload
 
@@ -49,11 +49,17 @@ def _ensure_processed_audio_dir() -> Path:
     return processed_dir
 
 
-def save_audio_upload(file, db: Session) -> AudioAnalysis:
+def save_audio_upload(
+    file,
+    db: Session,
+    source: AudioSource = AudioSource.UPLOAD,
+) -> AudioAnalysis:
     """Validate, store, and record an uploaded audio file.
 
     ``file`` is a FastAPI ``UploadFile``. The user-supplied filename is
     never used for storage; a UUID-based name is generated instead.
+    ``source`` marks where the audio came from (file upload or microphone
+    recording) so history can distinguish the two without a separate table.
     """
     filename = (file.filename or "upload").strip() or "upload"
     mime_type = file.content_type
@@ -75,6 +81,7 @@ def save_audio_upload(file, db: Session) -> AudioAnalysis:
     duration_seconds = detect_audio_duration(content, extension)
 
     record = AudioAnalysis(
+        source=source.value,
         original_filename=filename,
         stored_filename=stored_filename,
         file_extension=extension,

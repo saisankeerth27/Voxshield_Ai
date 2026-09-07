@@ -63,6 +63,27 @@ detection history.
 **No AI predictions are generated yet.** Values display "Not analyzed"
 until the ML phases arrive.
 
+## Microphone Recording & Analysis
+
+The **Analyze** page can record straight from the browser microphone instead
+of uploading a file:
+
+- Recording uses the standard `getUserMedia` + `MediaRecorder` APIs, so no
+  server-side streaming is involved. Permission is requested only when you
+  press **Start recording**, never on page load.
+- Recordings are capped at **60 seconds** and auto-stop at the cap.
+- Recorded audio is sent through the exact same upload → preprocess →
+  deepfake → speaker → risk pipeline as file uploads. It is marked with
+  `source=MICROPHONE` so the **History** page can tell mic captures apart
+  from file uploads (each row shows a **Mic** or **Upload** badge).
+- The analysis updates near-real-time: each stage only flips to *done* when
+  the backend has really completed it. If no speaker profile is registered,
+  speaker impersonation verification is marked *skipped* and the risk stage
+  is not run (no fabricated scores).
+- WebM (.webm, typical of mic captures) is accepted alongside WAV/MP3/M4A/OGG.
+
+See [`docs/microphone-analysis.md`](docs/microphone-analysis.md) for details.
+
 ## Technology Stack
 
 | Layer      | Technology                                                       |
@@ -142,7 +163,7 @@ CREATE DATABASE voiceshield;
 │       ├── pages/        # Landing, Dashboard, Analyze, History, Profile
 │       ├── layouts/      # App shell
 │       ├── services/     # api, audio, analysis, profile
-│       ├── hooks/        # useRecorder, useUploadFlow, useBackendHealth
+│       ├── hooks/        # useRecorder, useVoiceAnalysis, useUploadFlow, useBackendHealth
 │       ├── types/        # audio, analysis, api
 │       ├── utils/        # validation, formatting, api errors
 │       └── assets/       # static assets

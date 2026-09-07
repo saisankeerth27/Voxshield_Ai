@@ -9,6 +9,16 @@ export function formatDuration(seconds: number): string {
   return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }
 
+/** Zero-padded stopwatch format (MM:SS), e.g. "00:23" for recorder timers. */
+export function formatTimer(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${minutes.toString().padStart(2, "0")}:${secs
+    .toString()
+    .padStart(2, "0")}`;
+}
+
 /** Format a byte count as a human-readable file size (e.g. "2.4 MB"). */
 export function formatFileSize(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) {

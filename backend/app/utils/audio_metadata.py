@@ -2,7 +2,7 @@
 
 Duration detection is done without any ML or heavy audio dependencies.
 WAV duration is parsed directly from the RIFF/WAVE header (byte rate vs
-data size). MP3, M4A, and OGG require a decoder (e.g. FFmpeg) and are
+data size). MP3, M4A, OGG, and WEBM require a decoder (e.g. FFmpeg) and are
 deferred to Phase 3 — a ``None`` duration is returned rather than a fake
 value.
 """
@@ -46,7 +46,7 @@ def detect_wav_duration(content: bytes) -> float | None:
 def detect_audio_duration(content: bytes, extension: str) -> float | None:
     """Return audio duration when it can be derived without dependencies.
 
-    Only WAV is supported in this phase. MP3/M4A/OGG return ``None``.
+    Only WAV is supported in this phase. MP3/M4A/OGG/WEBM return ``None``.
     """
     if extension == "wav":
         try:

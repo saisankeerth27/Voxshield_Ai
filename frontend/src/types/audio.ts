@@ -1,4 +1,4 @@
-export type SupportedAudioFormat = "wav" | "mp3" | "m4a" | "ogg";
+export type SupportedAudioFormat = "wav" | "mp3" | "m4a" | "ogg" | "webm";
 
 export type UploadFlowState =
   | "IDLE"

@@ -21,7 +21,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.database import Base
-from app.models.enums import AudioAnalysisStatus, SpeakerVerificationStatus
+from app.models.enums import (
+    AudioAnalysisStatus,
+    AudioSource,
+    SpeakerVerificationStatus,
+)
 
 
 def _enum_values(cls: type[AudioAnalysisStatus] | type[SpeakerVerificationStatus]) -> list[str]:
@@ -34,6 +38,12 @@ class AudioAnalysis(Base):
     __tablename__ = "audio_analyses"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    source: Mapped[str] = mapped_column(
+        String(20),
+        default=AudioSource.UPLOAD.value,
+        nullable=False,
+        index=True,
+    )
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     stored_filename: Mapped[str] = mapped_column(
         String(255), nullable=False, unique=True

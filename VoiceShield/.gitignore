@@ -1,0 +1,44 @@
+# Environment files — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Data / models / uploads
+uploads/
+backend/uploads/
+models/
+logs/
+*.db
+tmp/
+
+# Build output
+dist/
+build/
+
+# Frontend
+frontend/dist/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Misc
+*.log
+coverage/
+htmlcov/

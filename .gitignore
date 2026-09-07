@@ -1,0 +1,47 @@
+# Environment files — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+VoiceShield/backend/venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Data / model / audio storage (never expose uploads or processed audio)
+uploads/
+backend/uploads/
+VoiceShield/backend/uploads/
+processed_audio/
+VoiceShield/backend/processed_audio/
+models/
+logs/
+*.db
+tmp/
+
+# Build output
+dist/
+build/
+frontend/dist/
+VoiceShield/frontend/dist/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Misc
+*.log
+coverage/
+htmlcov/

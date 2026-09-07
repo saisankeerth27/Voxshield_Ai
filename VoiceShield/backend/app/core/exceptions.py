@@ -1,0 +1,105 @@
+"""Centralized exception handling for the API.
+
+Each exception maps to a specific HTTP status code and produces a
+consistent JSON error envelope for the client. Internal details
+(stack traces) are never exposed.
+"""
+
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
+
+
+class VoiceShieldError(Exception):
+    """Base exception for all application-level errors."""
+
+    status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
+    code: str = "internal_error"
+    detail: str = "An unexpected error occurred."
+
+    def __init__(self, detail: str | None = None) -> None:
+        if detail is not None:
+            self.detail = detail
+        super().__init__(self.detail)
+
+
+class BadRequestError(VoiceShieldError):
+    """400 - Request could not be understood."""
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    code = "bad_request"
+
+
+class NotFoundError(VoiceShieldError):
+    """404 - Requested resource does not exist."""
+
+    status_code = status.HTTP_404_NOT_FOUND
+    code = "not_found"
+
+
+class ValidationError(VoiceShieldError):
+    """422 - Payload failed validation."""
+
+    status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+    code = "validation_error"
+
+
+class FileTooLargeError(VoiceShieldError):
+    """413 - Uploaded file exceeds the configured maximum."""
+
+    status_code = status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+    code = "file_too_large"
+
+
+class ConflictError(VoiceShieldError):
+    """409 - Resource already exists / conflict with current state."""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "conflict"
+
+
+class ServiceUnavailableError(VoiceShieldError):
+    """503 - Dependency (e.g. database) is unavailable."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    code = "service_unavailable"
+
+
+def _error_response(err: VoiceShieldError) -> JSONResponse:
+    return JSONResponse(
+        status_code=err.status_code,
+        content={
+            "error": {
+                "code": err.code,
+                "message": err.detail,
+            }
+        },
+    )
+
+
+def _unhandled_response(request: Request, exc: Exception) -> JSONResponse:
+    """Generic handler: never leak internals to the client."""
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "error": {
+                "code": "internal_error",
+                "message": "An unexpected error occurred.",
+            }
+        },
+    )
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    """Wire custom exception handlers onto the FastAPI app."""
+
+    @app.exception_handler(VoiceShieldError)
+    async def voice_shield_error_handler(
+        request: Request, exc: VoiceShieldError
+    ) -> JSONResponse:
+        return _error_response(exc)
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
+        return _unhandled_response(request, exc)

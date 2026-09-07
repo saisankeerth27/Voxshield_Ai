@@ -4,9 +4,11 @@ import {
   BrainCircuit,
   CheckCircle2,
   FileUp,
+  Gauge,
   Loader2,
   Mic,
   ScanLine,
+  ShieldCheck,
   Square,
   TriangleAlert,
   Users,
@@ -22,8 +24,10 @@ import AudioWaveform from "../components/AudioWaveform";
 import SpectrogramViewer from "../components/SpectrogramViewer";
 import StatusBadge from "../components/StatusBadge";
 import FileDropzone from "../components/FileDropzone";
-import RiskAssessmentCard from "../components/RiskAssessmentCard";
+import RiskAlert from "../components/RiskAlert";
+import RiskResultCard from "../components/RiskResultCard";
 import type {
+  AudioAnalysis,
   AudioPreprocessResponse,
   DeepfakeRunResponse,
   RiskCalculateResponse,
@@ -112,6 +116,22 @@ const INITIAL_RISK: RiskState = {
   result: null,
   error: null,
 };
+
+/** Build a risk response from a stored analysis record (no re-inference). */
+function riskFromRecord(record: AudioAnalysis): RiskCalculateResponse {
+  return {
+    analysis_id: record.analysis_id,
+    status: record.status,
+    risk_status: record.risk_status ?? "CALCULATED",
+    risk_score: record.risk_score,
+    risk_level: record.risk_level,
+    explanation: record.risk_explanation,
+    recommendation: record.risk_recommendation,
+    risk_processing_time: record.risk_processing_time,
+    risk_engine_version: record.risk_engine_version,
+    message: "Loaded from stored analysis",
+  };
+}
 
 function formatSampleRate(rate: number | null): string {
   return rate ? `${(rate / 1000).toFixed(rate % 1000 === 0 ? 0 : 1)} kHz` : "—";
@@ -275,45 +295,79 @@ function AnalysisProgress({
   calculated: boolean;
 }) {
   const steps = [
-    { label: "Upload audio", done: uploaded, active: false },
-    { label: "Prepare audio", done: prepared, active: preparing },
-    { label: "Deepfake detection", done: detected, active: detecting },
     {
-      label: "Speaker verification",
+      number: 1,
+      label: "Upload Audio",
+      done: uploaded,
+      active: false,
+    },
+    {
+      number: 2,
+      label: "Prepare Audio",
+      done: prepared,
+      active: preparing,
+    },
+    {
+      number: 3,
+      label: "Detect AI Voice",
+      done: detected,
+      active: detecting,
+    },
+    {
+      number: 4,
+      label: "Verify Speaker",
       done: verified,
       active: verifying,
     },
     {
-      label: "Risk assessment",
+      number: 5,
+      label: "Calculate Risk",
       done: calculated,
       active: calculating,
     },
   ];
+
+  const statusLabel = (step: (typeof steps)[number]): string => {
+    if (step.done) return "Complete";
+    if (step.active) return "In progress";
+    if (step.number === 1) return "Waiting";
+    const previousDone = steps[step.number - 2].done;
+    return previousDone ? "Ready" : "Waiting";
+  };
+
   return (
-    <div className="rounded-xl border border-white/5 bg-surface-light p-4">
-      <div className="flex items-center gap-2">
-        <ScanLine className="h-4 w-4 text-emerald-400" />
-        <h3 className="text-sm font-semibold text-slate-200">
-          Analysis progress
-        </h3>
-      </div>
-      <ol className="mt-3 space-y-2">
-        {steps.map((step) => (
-          <li key={step.label} className="flex items-center gap-2 text-sm">
-            {step.done ? (
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-            ) : step.active ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-emerald-400" />
-            ) : (
-              <span className="h-4 w-4 shrink-0 rounded-full border border-slate-600" />
-            )}
-            <span className={step.done ? "text-slate-200" : "text-slate-400"}>
-              {step.label}
-            </span>
-          </li>
-        ))}
-      </ol>
-    </div>
+    <ol className="space-y-2 rounded-xl border border-white/5 bg-surface-light p-4">
+      {steps.map((step) => (
+        <li key={step.number} className="flex items-center gap-3 text-sm">
+          <span
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+              step.done
+                ? "bg-emerald-500 text-surface"
+                : step.active
+                  ? "border border-emerald-500 text-emerald-400"
+                  : "border border-slate-600 text-slate-500"
+            }`}
+          >
+            {step.done ? "✓" : step.number}
+          </span>
+          <span className={step.done ? "text-slate-200" : "text-slate-400"}>
+            Step {step.number} · {step.label}
+          </span>
+          <span
+            className={`ml-auto text-xs font-medium ${
+              step.done
+                ? "text-emerald-400"
+                : step.active
+                  ? "text-emerald-400"
+                  : "text-slate-500"
+            }`}
+          >
+            {step.active ? <Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" /> : null}
+            {statusLabel(step)}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -325,6 +379,7 @@ export default function AnalyzePage() {
   const [detect, setDetect] = useState<DetectState>(INITIAL_DETECT);
   const [verify, setVerify] = useState<VerifyState>(INITIAL_VERIFY);
   const [risk, setRisk] = useState<RiskState>(INITIAL_RISK);
+  const [loadedRecord, setLoadedRecord] = useState<AudioAnalysis | null>(null);
 
   const uploadError = upload.state === "ERROR" ? upload.error : null;
 
@@ -334,6 +389,43 @@ export default function AnalyzePage() {
     setVerify(INITIAL_VERIFY);
     setRisk(INITIAL_RISK);
   }, [upload.uploadResult?.analysis_id]);
+
+  // "View Analysis" support: ?id=<analysis_id> loads a stored result.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    if (!id) {
+      return;
+    }
+    let cancelled = false;
+    audioService
+      .get(id)
+      .then((record) => {
+        if (cancelled || !record.risk_level) return;
+        setLoadedRecord(record);
+        setPrepare({ phase: "done", result: null, error: null });
+        setDetect({ phase: "done", result: null, error: null });
+        setVerify({
+          phase: "done",
+          result: null,
+          error: null,
+          profile: null,
+        });
+        setRisk({ phase: "done", result: riskFromRecord(record), error: null });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRisk((prev) => ({
+            ...prev,
+            phase: "error",
+            error: "Unable to load the stored analysis. Please try again.",
+          }));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const runPreprocess = async () => {
     if (!upload.uploadResult) return;
@@ -413,6 +505,25 @@ export default function AnalyzePage() {
     ? audioService.processedUrl(prepare.result.analysis_id)
     : null;
 
+  const totalAnalysisTime = Number(
+    (
+      (detect.result?.processing_time_seconds ??
+        loadedRecord?.deepfake_processing_time ??
+        0) +
+      (verify.result?.speaker_processing_time ??
+        loadedRecord?.speaker_processing_time ??
+        0) +
+      (risk.result?.risk_processing_time ??
+        loadedRecord?.risk_processing_time ??
+        0)
+    ).toFixed(2),
+  );
+
+  const riskCanRun = detect.phase === "done" && verify.phase === "done";
+  const detectCanRun = prepare.phase === "done";
+  const verifyCanRun =
+    prepare.phase === "done" && Boolean(verify.profile?.has_profile);
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-3xl font-bold">Voice Analysis</h1>
@@ -447,10 +558,10 @@ export default function AnalyzePage() {
         </button>
       </div>
 
-      {upload.state === "UPLOADED" ? (
+      {upload.state === "UPLOADED" || risk.phase === "done" ? (
         <div className="mt-6 max-w-md">
           <AnalysisProgress
-            uploaded
+            uploaded={upload.state === "UPLOADED"}
             preparing={prepare.phase === "preparing"}
             prepared={prepare.phase === "done"}
             detecting={detect.phase === "detecting"}
@@ -635,7 +746,7 @@ export default function AnalyzePage() {
                   <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
                     <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                     <div className="min-w-0">
-                      <p className="font-medium">Preprocessing failed</p>
+                      <p className="font-medium">Audio preprocessing failed.</p>
                       <p className="mt-0.5 break-words text-xs">
                         {prepare.error}
                       </p>
@@ -686,7 +797,8 @@ export default function AnalyzePage() {
                     </p>
                     <button
                       onClick={() => void runDeepfake()}
-                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-400 transition-colors"
+                      disabled={!detectCanRun}
+                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-40 enabled:transition-colors"
                     >
                       <BrainCircuit className="h-4 w-4" />
                       Detect AI Voice
@@ -733,7 +845,7 @@ export default function AnalyzePage() {
                   <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
                     <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                     <div className="min-w-0">
-                      <p className="font-medium">Deepfake detection could not run</p>
+                      <p className="font-medium">Deepfake detection failed.</p>
                       <p className="mt-0.5 break-words text-xs">{detect.error}</p>
                       <button
                         onClick={() => void runDeepfake()}
@@ -796,7 +908,7 @@ export default function AnalyzePage() {
 
                     <button
                       onClick={() => void runVerify()}
-                      disabled={!verify.profile?.has_profile}
+                      disabled={!verifyCanRun}
                       className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-surface hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40 enabled:transition-colors"
                     >
                       <Users className="h-4 w-4" />
@@ -869,7 +981,7 @@ export default function AnalyzePage() {
                     <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                     <div className="min-w-0">
                       <p className="font-medium">
-                        Speaker verification could not run
+                        Speaker verification failed.
                       </p>
                       <p className="mt-0.5 break-words text-xs">
                         {verify.error}
@@ -890,16 +1002,77 @@ export default function AnalyzePage() {
             {upload.state === "UPLOADED" &&
             upload.uploadResult &&
             prepare.phase === "done" ? (
-              <div className="mt-4">
-                <RiskAssessmentCard
-                  phase={risk.phase}
-                  result={risk.result}
-                  error={risk.error}
-                  disabled={
-                    detect.phase !== "done" || verify.phase !== "done"
-                  }
-                  onCalculate={() => void runRisk()}
-                />
+              <div className="mt-4 rounded-xl border border-white/5 bg-surface p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Gauge className="h-5 w-5 text-emerald-400" />
+                    <h3 className="font-semibold text-slate-200">
+                      Step 5 · Calculate Risk
+                    </h3>
+                  </div>
+                  {risk.phase === "done" && risk.result ? (
+                    <StatusBadge
+                      label={risk.result.risk_level ?? "Not calculated"}
+                      variant={
+                        risk.result.risk_level === "HIGH"
+                          ? "danger"
+                          : risk.result.risk_level === "MEDIUM"
+                            ? "warn"
+                            : risk.result.risk_level === "LOW"
+                              ? "ok"
+                              : "idle"
+                      }
+                    />
+                  ) : null}
+                </div>
+
+                {risk.phase === "idle" ? (
+                  <>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Combine the deepfake probability and speaker
+                      verification into a single risk score.
+                    </p>
+                    <button
+                      onClick={() => void runRisk()}
+                      disabled={!riskCanRun}
+                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-surface hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40 enabled:transition-colors"
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                      Calculate Risk
+                    </button>
+                    {!riskCanRun ? (
+                      <p className="mt-2 text-xs text-amber-400">
+                        Requires deepfake detection and speaker verification
+                        to be complete.
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {risk.phase === "calculating" ? (
+                  <div className="mt-3 flex items-center gap-2 text-slate-300">
+                    <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                    <span className="text-sm">Analyzing voice…</span>
+                  </div>
+                ) : null}
+
+                {risk.phase === "error" ? (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                    <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium">Risk calculation failed.</p>
+                      <p className="mt-0.5 break-words text-xs">
+                        {risk.error}
+                      </p>
+                      <button
+                        onClick={() => void runRisk()}
+                        className="mt-2 rounded-md border border-red-500/40 px-3 py-1 text-xs font-medium hover:bg-red-500/20 transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -1000,6 +1173,43 @@ export default function AnalyzePage() {
           ) : null}
         </div>
       )}
+
+      {risk.phase === "done" && risk.result && risk.result.risk_level ? (
+        <div className="mt-8 space-y-4">
+          <h2 className="text-xl font-bold">Voice Security Result</h2>
+          <RiskResultCard
+            aiProbability={
+              detect.result?.ai_probability ??
+              loadedRecord?.ai_probability ??
+              null
+            }
+            speakerSimilarity={
+              verify.result?.similarity_score ??
+              loadedRecord?.speaker_similarity ??
+              null
+            }
+            riskScore={risk.result.risk_score}
+            riskLevel={risk.result.risk_level}
+            explanation={risk.result.explanation}
+            recommendation={risk.result.recommendation}
+            analysisTimeSeconds={totalAnalysisTime}
+          />
+          <RiskAlert
+            riskLevel={risk.result.risk_level}
+            aiProbability={
+              detect.result?.ai_probability ??
+              loadedRecord?.ai_probability ??
+              null
+            }
+            speakerSimilarity={
+              verify.result?.similarity_score ??
+              loadedRecord?.speaker_similarity ??
+              null
+            }
+            riskScore={risk.result.risk_score}
+          />
+        </div>
+      ) : null}
 
       <div className="mt-6">
         <AnalysisResultPanel result={detect.result} />

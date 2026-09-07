@@ -12,6 +12,7 @@ import {
   ScanLine,
 } from "lucide-react";
 import MetricCard from "../components/MetricCard";
+import RiskAlert from "../components/RiskAlert";
 import StatusBadge from "../components/StatusBadge";
 import { useBackendHealth } from "../hooks/useBackendHealth";
 import { audioService } from "../services/audioService";
@@ -214,6 +215,19 @@ export default function DashboardPage() {
         <MetricSection analysis={latest} />
       </div>
 
+      {latest?.risk_level ? (
+        <div className="mt-6">
+          <RiskAlert
+            riskLevel={latest.risk_level}
+            aiProbability={latest.ai_probability}
+            speakerSimilarity={latest.speaker_similarity}
+            riskScore={latest.risk_score}
+            linkTo={`/analyze?id=${latest.analysis_id}`}
+            linkLabel="View Analysis"
+          />
+        </div>
+      ) : null}
+
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <SectionCard
           icon={Radar}
@@ -281,10 +295,17 @@ export default function DashboardPage() {
                   {formatRiskScore(latest.risk_score)}
                 </p>
               ) : null}
+              <Link
+                to={`/analyze?id=${latest.analysis_id}`}
+                className="mt-2 inline-flex items-center gap-2 rounded-lg border border-emerald-500/40 px-3 py-1.5 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-500/10"
+              >
+                <ScanLine className="h-4 w-4" />
+                View Analysis
+              </Link>
             </div>
           ) : (
             <p className="text-sm text-slate-400">
-              No audio has been uploaded yet. Start from the Analyze page.
+              No analysis available. Start from the Analyze page.
             </p>
           )}
         </SectionCard>

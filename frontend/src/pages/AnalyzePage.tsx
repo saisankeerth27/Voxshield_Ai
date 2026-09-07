@@ -218,7 +218,7 @@ function AnalysisProgress({
   const statusLabel = (state: ProgressState): string => {
     switch (state) {
       case "done":
-        return "Complete";
+        return "Done";
       case "running":
         return "In progress";
       case "ready":
@@ -325,29 +325,64 @@ function buildProgressSteps(stages: {
   const d = stages.detect;
   const v = stages.verify;
   const r = stages.risk;
-  return [
-    { number: 1, label: "Upload Audio", state: stages.uploaded ? "done" : "waiting" },
+  const failed = [p, d, v, r].some((phase) => phase === "error");
+  const completed = r === "done";
+
+  const steps: { number: number; label: string; state: ProgressState }[] = [
+    {
+      number: 1,
+      label: stages.uploaded ? "Audio uploaded" : "Upload audio",
+      state: stages.uploaded ? "done" : "waiting",
+    },
     {
       number: 2,
-      label: "Prepare Audio",
+      label:
+        p === "done"
+          ? "Audio prepared"
+          : p === "running"
+            ? "Preparing audio…"
+            : "Prepare audio",
       state: p === "done" ? "done" : p === "running" ? "running" : p === "error" ? "error" : stages.uploaded ? "ready" : "waiting",
     },
     {
       number: 3,
-      label: "Detect AI Voice",
+      label:
+        d === "done"
+          ? "AI voice detection completed"
+          : d === "running"
+            ? "Analyzing voice…"
+            : "Analyze voice",
       state: d === "done" ? "done" : d === "running" ? "running" : d === "error" ? "error" : p === "done" ? "ready" : "waiting",
     },
     {
       number: 4,
-      label: "Verify Speaker",
+      label:
+        v === "done"
+          ? "Speaker verification completed"
+          : v === "running"
+            ? "Verifying speaker…"
+            : v === "skipped"
+              ? "Speaker verification unavailable"
+              : "Verify speaker",
       state: v === "done" ? "done" : v === "running" ? "running" : v === "error" ? "error" : v === "skipped" ? "skipped" : d === "done" ? "ready" : "waiting",
     },
     {
       number: 5,
-      label: "Calculate Risk",
+      label:
+        r === "done"
+          ? "Risk assessment completed"
+          : r === "running"
+            ? "Calculating risk"
+            : "Calculate risk",
       state: r === "done" ? "done" : r === "running" ? "running" : r === "error" ? "error" : d === "done" && v === "done" ? "ready" : "waiting",
     },
+    {
+      number: 6,
+      label: failed ? "Analysis failed" : completed ? "Analysis completed" : "Result",
+      state: failed ? "error" : completed ? "done" : "waiting",
+    },
   ];
+  return steps;
 }
 
 export default function AnalyzePage() {
@@ -358,8 +393,27 @@ export default function AnalyzePage() {
   const [micRunning, setMicRunning] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [pipelineRunning, setPipelineRunning] = useState(false);
 
   const uploadError = upload.state === "ERROR" ? upload.error : null;
+
+  const runFullPipeline = async (analysisId: string) => {
+    setPipelineRunning(true);
+    setMicError(null);
+    setLoadError(null);
+    try {
+      await analysis.runPipeline(analysisId);
+    } finally {
+      setPipelineRunning(false);
+    }
+  };
+
+  const handleUploadAndAnalyze = async () => {
+    const response = await upload.startUpload();
+    if (response) {
+      await runFullPipeline(response.analysis_id);
+    }
+  };
 
   // "View Analysis" support: ?id=<analysis_id> loads a stored result.
   useEffect(() => {
@@ -626,7 +680,8 @@ export default function AnalyzePage() {
                       </p>
                       <button
                         onClick={() => void analysis.runPreprocess()}
-                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-surface hover:bg-emerald-400 transition-colors"
+                        disabled={pipelineRunning}
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-surface hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
                       >
                         <Wand2 className="h-4 w-4" />
                         Prepare Audio for Analysis
@@ -726,7 +781,7 @@ export default function AnalyzePage() {
                       </p>
                       <button
                         onClick={() => void analysis.runDeepfake()}
-                        disabled={!detectCanRun}
+                        disabled={!detectCanRun || pipelineRunning}
                         className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-40 enabled:transition-colors"
                       >
                         <BrainCircuit className="h-4 w-4" />
@@ -781,7 +836,8 @@ export default function AnalyzePage() {
                         </p>
                         <button
                           onClick={() => void analysis.runDeepfake()}
-                          className="mt-2 rounded-md border border-red-500/40 px-3 py-1 text-xs font-medium hover:bg-red-500/20 transition-colors"
+                          disabled={pipelineRunning}
+                          className="mt-2 rounded-md border border-red-500/40 px-3 py-1 text-xs font-medium hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
                         >
                           Retry
                         </button>
@@ -843,7 +899,7 @@ export default function AnalyzePage() {
 
                       <button
                         onClick={() => void analysis.runVerify()}
-                        disabled={!verifyCanRun}
+                        disabled={!verifyCanRun || pipelineRunning}
                         className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-surface hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40 enabled:transition-colors"
                       >
                         <Users className="h-4 w-4" />
@@ -980,7 +1036,7 @@ export default function AnalyzePage() {
                       </p>
                       <button
                         onClick={() => void analysis.runRisk()}
-                        disabled={!riskCanRun}
+                        disabled={!riskCanRun || pipelineRunning}
                         className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-surface hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40 enabled:transition-colors"
                       >
                         <ShieldCheck className="h-4 w-4" />
@@ -1013,7 +1069,8 @@ export default function AnalyzePage() {
                         </p>
                         <button
                           onClick={() => void analysis.runRisk()}
-                          className="mt-2 rounded-md border border-red-500/40 px-3 py-1 text-xs font-medium hover:bg-red-500/20 transition-colors"
+                          disabled={pipelineRunning}
+                          className="mt-2 rounded-md border border-red-500/40 px-3 py-1 text-xs font-medium hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
                         >
                           Retry
                         </button>
@@ -1027,25 +1084,39 @@ export default function AnalyzePage() {
                 <button
                   onClick={analysis.clear}
                   disabled={
-                    upload.state === "IDLE" || upload.state === "UPLOADING"
+                    pipelineRunning ||
+                    upload.state === "IDLE" ||
+                    upload.state === "UPLOADING"
                   }
                   className="rounded-lg border border-slate-600 px-4 py-2.5 text-sm font-medium text-slate-300 hover:border-red-500/50 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-600 disabled:hover:text-slate-300 transition-colors"
                 >
                   Clear
                 </button>
                 <button
-                  onClick={() => void upload.startUpload()}
+                  onClick={() => void handleUploadAndAnalyze()}
                   disabled={
-                    upload.state !== "SELECTED" && upload.state !== "ERROR"
+                    pipelineRunning ||
+                    upload.state === "UPLOADING" ||
+                    (upload.state !== "SELECTED" &&
+                      upload.state !== "ERROR" &&
+                      upload.state !== "UPLOADED")
                   }
                   className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-6 py-2.5 font-semibold transition-colors ${
-                    upload.state === "SELECTED" || upload.state === "ERROR"
-                      ? "bg-emerald-500 text-surface hover:bg-emerald-400 cursor-pointer"
-                      : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
+                    pipelineRunning
+                      ? "bg-slate-700/50 text-slate-400 cursor-wait"
+                      : upload.state === "SELECTED" || upload.state === "ERROR"
+                        ? "bg-emerald-500 text-surface hover:bg-emerald-400 cursor-pointer"
+                        : upload.state === "UPLOADED"
+                          ? "bg-emerald-500 text-surface hover:bg-emerald-400 cursor-pointer"
+                          : "bg-slate-700/50 text-slate-500 cursor-not-allowed"
                   }`}
                 >
                   <ScanLine className="h-5 w-5" />
-                  Upload for Analysis
+                  {upload.state === "UPLOADING"
+                    ? "Uploading…"
+                    : pipelineRunning
+                      ? "Analyzing…"
+                      : "Analyze Voice"}
                 </button>
               </div>
             </div>

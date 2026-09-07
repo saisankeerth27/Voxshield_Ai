@@ -1,5 +1,4 @@
 import { ShieldCheck } from "lucide-react";
-import RiskIndicator from "./RiskIndicator";
 import type { AudioSource } from "../types/analysis";
 
 interface RiskResultCardProps {
@@ -14,6 +13,31 @@ interface RiskResultCardProps {
   /** Origin of the analyzed audio (UPLOAD or MICROPHONE). */
   source?: AudioSource | null;
 }
+
+const LEVEL_META: Record<
+  string,
+  { text: string; chip: string; summary: string }
+> = {
+  HIGH: {
+    text: "text-red-400",
+    chip: "border-red-500/40 bg-red-500/10",
+    summary:
+      "Potential AI-generated voice impersonation detected. Additional verification is recommended.",
+  },
+  MEDIUM: {
+    text: "text-amber-400",
+    chip: "border-amber-500/40 bg-amber-500/10",
+    summary: "Some indicators require additional verification.",
+  },
+  LOW: {
+    text: "text-emerald-400",
+    chip: "border-emerald-500/40 bg-emerald-500/10",
+    summary: "No strong indicators of AI-generated voice impersonation were detected.",
+  },
+};
+
+const DISCLAIMER =
+  "VoiceShield provides AI-assisted risk assessment. Results are not absolute proof of identity, fraud, or malicious intent.";
 
 function formatPercent(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {
@@ -62,6 +86,8 @@ export default function RiskResultCard({
   analysisTimeSeconds,
   source,
 }: RiskResultCardProps) {
+  const meta = riskLevel ? LEVEL_META[riskLevel] : null;
+
   return (
     <div className="rounded-xl border border-white/5 bg-surface-light p-6">
       <div className="flex items-center justify-between gap-3">
@@ -69,32 +95,47 @@ export default function RiskResultCard({
           <ShieldCheck className="h-5 w-5 text-emerald-400" />
           <h2 className="text-lg font-semibold">Voice Security Result</h2>
         </div>
-        <RiskIndicator level={riskLevel} />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Prominent risk level banner */}
+      <div
+        className={`mt-4 flex items-center justify-between gap-4 rounded-xl border p-5 ${
+          meta?.chip ?? "border-slate-600 bg-surface"
+        }`}
+      >
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Risk Level
+          </p>
+          <p
+            className={`mt-1 text-4xl font-extrabold ${meta?.text ?? "text-slate-300"}`}
+          >
+            {riskLevel ?? "—"}
+          </p>
+        </div>
+        <p
+          className={`max-w-[220px] text-right text-sm ${meta?.text ?? "text-slate-400"}`}
+        >
+          {meta?.summary ?? "No risk assessment available."}
+        </p>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Metric
-          label="AI Generated Probability"
+          label="AI-generated probability"
           value={formatPercent(aiProbability)}
         />
         <Metric
-          label="Speaker Similarity"
+          label="Speaker similarity"
           value={formatPercent(speakerSimilarity)}
         />
-        <Metric
-          label="Risk Score"
-          value={formatPercent(riskScore)}
-        />
-        <Metric
-          label="Risk Level"
-          value={riskLevel ?? "—"}
-        />
+        <Metric label="Risk score" value={formatPercent(riskScore)} />
       </div>
 
       {explanation ? (
         <div className="mt-4">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Explanation
+            Why this result?
           </p>
           <p className="mt-1 text-sm text-slate-300">{explanation}</p>
         </div>
@@ -103,7 +144,7 @@ export default function RiskResultCard({
       {recommendation ? (
         <div className="mt-4">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-            Recommendation
+            Recommended action
           </p>
           <p className="mt-1 text-sm text-slate-300">{recommendation}</p>
         </div>
@@ -122,10 +163,8 @@ export default function RiskResultCard({
             {formatTime(analysisTimeSeconds)}
           </span>
         </p>
-        <p className="text-xs text-slate-500">
-          Estimate only — not a proven probability of attack.
-        </p>
       </div>
+      <p className="mt-3 text-xs text-slate-500">{DISCLAIMER}</p>
     </div>
   );
 }

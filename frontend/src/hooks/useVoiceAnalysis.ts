@@ -86,10 +86,16 @@ export interface VoiceAnalysis {
   /** Refreshes and returns the stored speaker profile status. */
   refreshProfileStatus: () => Promise<SpeakerProfileStatusResponse | null>;
   /**
-   * Near-real-time microphone flow: once an analysis is uploaded, runs
+   * Near-real-time pipeline: once an analysis is uploaded, runs
    * preprocess -> deepfake -> speaker (only when a profile exists) -> risk,
    * updating each stage as the backend actually completes it. Returns early
-   * on the first failure and never fabricates a completed stage.
+   * on the first failure and never fabricates a completed stage. Works for
+   * both file uploads and microphone recordings.
+   */
+  runPipeline: (analysisId?: string) => Promise<void>;
+  /**
+   * Mic-specific alias for `runPipeline`. Upload flow calls `runPipeline`
+   * directly; the microphone flow keeps this historical name for tests.
    */
   runMicrophonePipeline: (analysisId?: string) => Promise<void>;
   /** Loads a stored record for `?id=` deep links. */
@@ -216,7 +222,7 @@ export function useVoiceAnalysis(): VoiceAnalysis {
     }
   }, []);
 
-  const runMicrophonePipeline = useCallback(
+  const runPipeline = useCallback(
     async (targetId?: string): Promise<void> => {
       const id = targetId ?? analysisIdRef.current;
       if (!id) return;
@@ -243,6 +249,8 @@ export function useVoiceAnalysis(): VoiceAnalysis {
     },
     [runPreprocess, runDeepfake, refreshProfileStatus, runVerify, runRisk],
   );
+
+  const runMicrophonePipeline = runPipeline;
 
   const loadFromRecord = useCallback(async (id: string): Promise<void> => {
     const record = await audioService.get(id);
@@ -292,6 +300,7 @@ export function useVoiceAnalysis(): VoiceAnalysis {
     runVerify,
     runRisk,
     refreshProfileStatus,
+    runPipeline,
     runMicrophonePipeline,
     loadFromRecord,
     clear,

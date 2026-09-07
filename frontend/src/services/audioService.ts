@@ -1,15 +1,18 @@
-import api from "./api";
+import { api, API_BASE_URL } from "./api";
 import type {
   AudioAnalysis,
   AudioListResponse,
+  AudioPreprocessResponse,
   AudioUploadResponse,
+  PreprocessStatusResponse,
 } from "../types/analysis";
 
 /**
- * Audio service: upload, fetch, list, and delete audio analysis records.
+ * Audio service: upload, preprocess, fetch, list, and delete audio records.
  *
  * Handles multipart uploads with progress reporting; all other calls use
- * the shared JSON API client.
+ * the shared JSON API client. Processed audio is streamed from a dedicated
+ * endpoint so its storage location is never exposed as a URL.
  */
 export const audioService = {
   /**
@@ -36,6 +39,29 @@ export const audioService = {
       },
     );
     return response.data;
+  },
+
+  /** Run the preprocessing pipeline. Sets status to READY_FOR_ANALYSIS. */
+  async preprocess(analysisId: string): Promise<AudioPreprocessResponse> {
+    const response = await api.post<AudioPreprocessResponse>(
+      `/audio/${analysisId}/preprocess`,
+    );
+    return response.data;
+  },
+
+  /** Fetch preprocessing status and media metadata. */
+  async getPreprocessingStatus(
+    analysisId: string,
+  ): Promise<PreprocessStatusResponse> {
+    const response = await api.get<PreprocessStatusResponse>(
+      `/audio/${analysisId}/preprocess`,
+    );
+    return response.data;
+  },
+
+  /** Absolute URL streaming the processed WAV for an analysis. */
+  processedUrl(analysisId: string): string {
+    return `${API_BASE_URL}/audio/${analysisId}/processed`;
   },
 
   /** Fetch metadata for a single analysis record. */

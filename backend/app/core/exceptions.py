@@ -57,6 +57,25 @@ class ConflictError(VoiceShieldError):
     code = "conflict"
 
 
+class FfmpegUnavailableError(VoiceShieldError):
+    """500 - FFmpeg binary could not be found on this system.
+
+    This is a configuration error: the audio pipeline requires FFmpeg for
+    non-WAV input formats.
+    """
+
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    code = "ffmpeg_unavailable"
+    detail = "FFmpeg is not installed or could not be found."
+
+
+class PreprocessingError(VoiceShieldError):
+    """500 - Unexpected failure while preprocessing audio."""
+
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    code = "preprocessing_failed"
+
+
 class ServiceUnavailableError(VoiceShieldError):
     """503 - Dependency (e.g. database) is unavailable."""
 

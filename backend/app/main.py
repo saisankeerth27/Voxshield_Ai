@@ -22,16 +22,20 @@ async def lifespan(app: FastAPI):
     still respond while the database comes online.
     """
     from app.database.database import init_db
-    from app.services.audio_service import _ensure_upload_dir
+    from app.services.audio_service import (
+        _ensure_processed_audio_dir,
+        _ensure_upload_dir,
+    )
 
     try:
         init_db()
     except Exception as exc:
         logger.warning("Database initialization failed: %s", exc)
-    try:
-        _ensure_upload_dir()
-    except OSError as exc:
-        logger.warning("Could not prepare upload directory: %s", exc)
+    for prepare in (_ensure_upload_dir, _ensure_processed_audio_dir):
+        try:
+            prepare()
+        except OSError as exc:
+            logger.warning("Could not prepare storage directory: %s", exc)
 
     yield
 

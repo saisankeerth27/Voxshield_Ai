@@ -1,7 +1,8 @@
-# VoiceShield backend — Phase 1 (foundation) dependencies
-# ML/audio dependencies are intentionally excluded; they are added in their
-# own phases. Do NOT install PyTorch, Transformers, SpeechBrain, Librosa,
-# Torchaudio, or Scikit-learn here.
+# VoiceShield backend dependencies
+# ML model stack (Transformers, SpeechBrain, Torchaudio, ECAPA-TDNN,
+# Wav2Vec2) is intentionally excluded and added in its own phase.
+# Librosa is used for high-quality resampling and silence trimming; it
+# pulls in numpy/scipy/numba/scikit-learn transitively.
 
 # Web framework
 fastapi==0.115.6
@@ -18,6 +19,14 @@ python-dotenv==1.0.1
 
 # File upload parsing (required by FastAPI UploadFile/File)
 python-multipart==0.0.20
+
+# Audio preprocessing (Phase 3)
+numpy==2.5.3
+soundfile==0.14.0
+librosa==1.0.0
+soxr==1.1.0
+# Bundles a static FFmpeg binary used as a fallback when FFmpeg is not on PATH
+imageio-ffmpeg==0.6.0
 
 # Testing
 pytest==8.3.4

@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     max_audio_size_mb: int = 25
     upload_dir: str = "uploads"
 
+    # Audio preprocessing
+    target_sample_rate: int = 16000
+    min_audio_duration_seconds: float = 1
+    max_audio_duration_seconds: float = 300
+    processed_audio_dir: str = "processed_audio"
+    # RMS floor (dB) below which a signal is treated as silence
+    silence_threshold_db: float = -50
+    # librosa top_db used to trim leading/trailing silence
+    trim_top_db: float = 35
+    # Optional explicit FFmpeg binary path (resolved otherwise)
+    ffmpeg_binary: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

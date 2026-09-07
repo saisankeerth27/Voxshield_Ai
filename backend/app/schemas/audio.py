@@ -31,8 +31,43 @@ class AudioAnalysisResponse(BaseModel):
     mime_type: str | None
     duration_seconds: float | None
     status: str
+    original_sample_rate: int | None
+    original_channels: int | None
+    processed_sample_rate: int | None
+    processed_channels: int | None
+    processed_duration_seconds: float | None
+    processed_filename: str | None
+    preprocessing_error: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class AudioMetadataBrief(BaseModel):
+    """Optional media summary used in preprocessing responses."""
+
+    sample_rate: int | None = None
+    channels: int | None = None
+    duration_seconds: float | None = None
+
+
+class AudioPreprocessResponse(BaseModel):
+    """Returned after a successful preprocessing run."""
+
+    success: bool
+    analysis_id: str
+    status: AudioAnalysisStatus
+    audio: AudioMetadataBrief
+    message: str
+
+
+class PreprocessStatusResponse(BaseModel):
+    """Metadata returned by GET preprocessing status."""
+
+    analysis_id: str
+    status: AudioAnalysisStatus
+    original: AudioMetadataBrief
+    processed: AudioMetadataBrief
+    preprocessing_error: str | None = None
 
 
 class AudioListItemResponse(BaseModel):

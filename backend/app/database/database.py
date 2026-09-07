@@ -5,14 +5,18 @@ Provides:
 - SessionLocal: session factory for per-request sessions
 - Base: declarative base for all ORM models
 - get_db: FastAPI dependency yielding a session
+- init_db: create tables and apply lightweight forward migrations
 """
 
+import logging
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
+
+logger = logging.getLogger("voiceshield")
 
 
 class Base(DeclarativeBase):
@@ -42,8 +46,34 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def _apply_forward_migrations() -> None:
+    """Add new columns to existing tables without dropping data.
+
+    Uses idempotent ``ALTER TABLE ... ADD COLUMN IF NOT EXISTS`` statements
+    (PostgreSQL dialect). SQLite errors are caught and ignored because its
+    in-memory test tables are already created by ``create_all``.
+    """
+    statements = [
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS original_sample_rate INTEGER",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS original_channels INTEGER",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS processed_sample_rate INTEGER",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS processed_channels INTEGER",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS processed_duration_seconds FLOAT",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS processed_filename VARCHAR(255)",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS preprocessing_error VARCHAR(2000)",
+    ]
+    with engine.connect() as conn:
+        for statement in statements:
+            try:
+                conn.execute(text(statement))
+                conn.commit()
+            except Exception as exc:  # pragma: no cover - dialect specific
+                conn.rollback()
+                logger.debug("Skipped migration %r: %s", statement, exc)
+
+
 def init_db() -> None:
-    """Create all tables defined by the ORM models.
+    """Create all tables defined by the ORM models and apply migrations.
 
     Called during application startup. Tables for detection history and
     voice profiles are added in later phases.
@@ -51,3 +81,4 @@ def init_db() -> None:
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _apply_forward_migrations()

@@ -1,27 +1,38 @@
-"""Audio upload orchestration service.
+"""Audio upload and preprocessing orchestration service.
 
 Responsibilities:
 - validate uploaded audio
 - generate a UUID-based storage filename
 - persist the file to temporary storage
 - create and manage the analysis database record
+- run the preprocessing pipeline and update analysis metadata
 - list / fetch / delete analyses
 
 The route handlers stay thin and delegate entirely to this layer.
 """
 
+import logging
 import uuid
 from pathlib import Path
+from time import monotonic
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.audio.preprocessor import AudioPreprocessor
 from app.core.config import settings
-from app.core.exceptions import NotFoundError, ServiceUnavailableError
+from app.core.exceptions import (
+    NotFoundError,
+    PreprocessingError,
+    ServiceUnavailableError,
+    VoiceShieldError,
+)
 from app.models.audio import AudioAnalysis
 from app.models.enums import AudioAnalysisStatus
 from app.utils.audio_metadata import detect_audio_duration
 from app.utils.file_validation import validate_audio_upload
+
+logger = logging.getLogger("voiceshield.service")
 
 
 def _ensure_upload_dir() -> Path:
@@ -29,6 +40,13 @@ def _ensure_upload_dir() -> Path:
     upload_dir = Path(settings.upload_dir)
     upload_dir.mkdir(parents=True, exist_ok=True)
     return upload_dir
+
+
+def _ensure_processed_audio_dir() -> Path:
+    """Create (if needed) and return the processed audio directory."""
+    processed_dir = Path(settings.processed_audio_dir)
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    return processed_dir
 
 
 def save_audio_upload(file, db: Session) -> AudioAnalysis:
@@ -107,7 +125,7 @@ def list_audio_analyses(
 
 
 def delete_audio_analysis(analysis_id: uuid.UUID, db: Session) -> None:
-    """Delete an analysis record and its stored audio file.
+    """Delete an analysis record and its stored audio files.
 
     Missing stored files are treated as already deleted, but unexpected
     filesystem and database errors are surfaced (never silently ignored).
@@ -122,6 +140,15 @@ def delete_audio_analysis(analysis_id: uuid.UUID, db: Session) -> None:
             "Unable to delete the stored audio file."
         ) from None
 
+    if record.processed_filename:
+        processed_path = Path(settings.processed_audio_dir) / record.processed_filename
+        try:
+            processed_path.unlink(missing_ok=True)
+        except OSError:
+            raise ServiceUnavailableError(
+                "Unable to delete the processed audio file."
+            ) from None
+
     try:
         db.delete(record)
         db.commit()
@@ -130,3 +157,117 @@ def delete_audio_analysis(analysis_id: uuid.UUID, db: Session) -> None:
         raise ServiceUnavailableError(
             "Unable to delete the analysis record."
         ) from None
+
+
+def preprocess_audio(analysis_id: uuid.UUID, db: Session) -> AudioAnalysis:
+    """Run preprocessing for an analysis and persist the metadata.
+
+    Status transitions: UPLOADED -> PREPROCESSING -> READY_FOR_ANALYSIS,
+    or -> FAILED with a stored error message.
+
+    Returns the record either after a fresh run or immediately when the
+    analysis is already READY_FOR_ANALYSIS (idempotent re-entry).
+    """
+    record = get_audio_analysis(analysis_id, db)
+
+    if (
+        record.status == AudioAnalysisStatus.READY_FOR_ANALYSIS
+        and record.processed_filename
+    ):
+        return record
+
+    stored_path = Path(settings.upload_dir) / record.stored_filename
+    if not stored_path.is_file():
+        raise NotFoundError("Original audio file not found.")
+
+    record.status = AudioAnalysisStatus.PREPROCESSING
+    record.preprocessing_error = None
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise ServiceUnavailableError(
+            "Unable to update the analysis record."
+        ) from None
+
+    logger.info("Preprocessing started analysis_id=%s", analysis_id)
+    start = monotonic()
+
+    try:
+        result = AudioPreprocessor().preprocess(stored_path)
+    except VoiceShieldError as exc:
+        _mark_preprocessing_failed(db, record, exc.detail)
+        logger.warning(
+            "Preprocessing failed analysis_id=%s error=%s",
+            analysis_id,
+            exc.detail,
+        )
+        raise
+    except Exception:
+        _mark_preprocessing_failed(
+            db, record, "Unexpected preprocessing failure."
+        )
+        logger.exception("Preprocessing crashed analysis_id=%s", analysis_id)
+        raise PreprocessingError(
+            "Unexpected preprocessing failure."
+        ) from None
+
+    record.original_sample_rate = result.original_sample_rate
+    record.original_channels = result.original_channels
+    record.duration_seconds = result.original_duration_seconds
+    record.processed_sample_rate = result.processed_sample_rate
+    record.processed_channels = result.processed_channels
+    record.processed_duration_seconds = result.processed_duration_seconds
+    record.processed_filename = result.processed_filename
+    record.preprocessing_error = None
+    record.status = AudioAnalysisStatus.READY_FOR_ANALYSIS
+
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        _cleanup_processed_file(result)
+        raise ServiceUnavailableError(
+            "Unable to save the preprocessing result."
+        ) from None
+
+    processing_time = monotonic() - start
+    logger.info(
+        "Preprocessing completed analysis_id=%s processing_time=%.2fs",
+        analysis_id,
+        processing_time,
+    )
+    return record
+
+
+def get_processed_audio_path(
+    analysis_id: uuid.UUID, db: Session
+) -> tuple[AudioAnalysis, Path]:
+    """Return the analysis record and its processed-audio path."""
+    record = get_audio_analysis(analysis_id, db)
+    if not record.processed_filename:
+        raise NotFoundError("Processed audio not found.")
+    processed_path = Path(settings.processed_audio_dir) / record.processed_filename
+    if not processed_path.is_file():
+        raise NotFoundError("Processed audio not found.")
+    return record, processed_path
+
+
+def _mark_preprocessing_failed(
+    db: Session, record: AudioAnalysis, message: str
+) -> None:
+    """Persist a FAILED preprocessing state with a stored error message."""
+    record.status = AudioAnalysisStatus.FAILED
+    record.preprocessing_error = message[:2000]
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+
+
+def _cleanup_processed_file(result) -> None:
+    """Best-effort removal of a just-written processed file."""
+    try:
+        Path(result.processed_path).unlink(missing_ok=True)
+    except OSError:
+        pass

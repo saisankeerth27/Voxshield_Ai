@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AudioLines,
   CheckCircle2,
@@ -8,15 +8,19 @@ import {
   ScanLine,
   Square,
   TriangleAlert,
+  Wand2,
 } from "lucide-react";
 import { useRecorder } from "../hooks/useRecorder";
 import { useUploadFlow } from "../hooks/useUploadFlow";
+import { audioService } from "../services/audioService";
 import { formatDuration, formatFileSize } from "../utils/format";
+import { getApiErrorMessage } from "../utils/apiError";
 import AudioPlayer from "../components/AudioPlayer";
 import AudioWaveform from "../components/AudioWaveform";
 import SpectrogramViewer from "../components/SpectrogramViewer";
 import StatusBadge from "../components/StatusBadge";
 import FileDropzone from "../components/FileDropzone";
+import type { AudioPreprocessResponse } from "../types/analysis";
 import type { UploadFlowState } from "../types/audio";
 
 const statusVariantFor = (
@@ -50,6 +54,26 @@ const statusLabelFor = (state: UploadFlowState): string => {
   }
 };
 
+interface PrepareState {
+  phase: "idle" | "preparing" | "done" | "error";
+  result: AudioPreprocessResponse | null;
+  error: string | null;
+}
+
+const INITIAL_PREPARE: PrepareState = {
+  phase: "idle",
+  result: null,
+  error: null,
+};
+
+function formatSampleRate(rate: number | null): string {
+  return rate ? `${(rate / 1000).toFixed(rate % 1000 === 0 ? 0 : 1)} kHz` : "—";
+}
+
+function formatChannels(channels: number | null): string {
+  return channels === 2 ? "Stereo" : channels === 1 ? "Mono" : "—";
+}
+
 function AnalysisResultPlaceholder() {
   return (
     <div className="rounded-xl border border-white/5 bg-surface-light p-6">
@@ -82,8 +106,30 @@ export default function AnalyzePage() {
   const [tab, setTab] = useState<"upload" | "record">("upload");
   const recorder = useRecorder();
   const upload = useUploadFlow();
+  const [prepare, setPrepare] = useState<PrepareState>(INITIAL_PREPARE);
 
   const uploadError = upload.state === "ERROR" ? upload.error : null;
+
+  useEffect(() => {
+    setPrepare(INITIAL_PREPARE);
+  }, [upload.uploadResult?.analysis_id]);
+
+  const runPreprocess = async () => {
+    if (!upload.uploadResult) return;
+    const analysisId = upload.uploadResult.analysis_id;
+    setPrepare({ phase: "preparing", result: null, error: null });
+    try {
+      const result = await audioService.preprocess(analysisId);
+      setPrepare({ phase: "done", result, error: null });
+    } catch (err) {
+      const message = getApiErrorMessage(err, "Preprocessing failed");
+      setPrepare({ phase: "error", result: null, error: message });
+    }
+  };
+
+  const processedUrl = prepare.result
+    ? audioService.processedUrl(prepare.result.analysis_id)
+    : null;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -213,6 +259,104 @@ export default function AnalyzePage() {
                     </dd>
                   </div>
                 </dl>
+              </div>
+            ) : null}
+
+            {/* Prepare audio step */}
+            {upload.state === "UPLOADED" && upload.uploadResult ? (
+              <div className="mt-4 rounded-xl border border-white/5 bg-surface p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Wand2 className="h-5 w-5 text-emerald-400" />
+                    <h3 className="font-semibold text-slate-200">
+                      Prepare Audio
+                    </h3>
+                  </div>
+                  {prepare.phase === "done" && prepare.result ? (
+                    <StatusBadge label={prepare.result.status} variant="ok" />
+                  ) : null}
+                </div>
+
+                {prepare.phase === "idle" ? (
+                  <>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Convert the upload to a mono, 16 kHz WAV with normalized
+                      levels — ready for deepfake analysis.
+                    </p>
+                    <button
+                      onClick={() => void runPreprocess()}
+                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-surface hover:bg-emerald-400 transition-colors"
+                    >
+                      <Wand2 className="h-4 w-4" />
+                      Prepare Audio for Analysis
+                    </button>
+                  </>
+                ) : null}
+
+                {prepare.phase === "preparing" ? (
+                  <div className="mt-3 flex items-center gap-2 text-slate-300">
+                    <Loader2 className="h-4 w-4 animate-spin text-emerald-400" />
+                    <span className="text-sm">Preparing audio…</span>
+                  </div>
+                ) : null}
+
+                {prepare.phase === "done" && prepare.result ? (
+                  <div className="mt-3">
+                    <dl className="grid grid-cols-3 gap-3 rounded-lg bg-surface-light/60 p-3 text-sm">
+                      <div>
+                        <dt className="text-xs text-slate-500">Sample rate</dt>
+                        <dd className="mt-0.5 font-medium text-slate-200">
+                          {formatSampleRate(prepare.result.audio.sample_rate)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-slate-500">Channels</dt>
+                        <dd className="mt-0.5 font-medium text-slate-200">
+                          {formatChannels(prepare.result.audio.channels)}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-slate-500">Duration</dt>
+                        <dd className="mt-0.5 font-medium text-slate-200">
+                          {prepare.result.audio.duration_seconds
+                            ? formatDuration(
+                                prepare.result.audio.duration_seconds,
+                              )
+                            : "—"}
+                        </dd>
+                      </div>
+                    </dl>
+                    <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+                      <CheckCircle2 className="h-4 w-4" />
+                      {prepare.result.message}
+                    </p>
+                  </div>
+                ) : null}
+
+                {prepare.phase === "error" ? (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                    <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium">Preprocessing failed</p>
+                      <p className="mt-0.5 break-words text-xs">
+                        {prepare.error}
+                      </p>
+                      <button
+                        onClick={() => void runPreprocess()}
+                        className="mt-2 rounded-md border border-red-500/40 px-3 py-1 text-xs font-medium hover:bg-red-500/20 transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {prepare.phase === "done" && processedUrl ? (
+                  <div className="mt-3">
+                    <p className="text-xs text-slate-500">Processed audio</p>
+                    <AudioPlayer audioUrl={processedUrl} />
+                  </div>
+                ) : null}
               </div>
             ) : null}
 

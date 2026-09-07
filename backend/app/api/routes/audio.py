@@ -7,6 +7,7 @@ only translate HTTP requests into service calls and responses.
 import uuid
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
@@ -15,7 +16,10 @@ from app.schemas.audio import (
     AudioDeleteResponse,
     AudioListItemResponse,
     AudioListResponse,
+    AudioMetadataBrief,
+    AudioPreprocessResponse,
     AudioUploadResponse,
+    PreprocessStatusResponse,
 )
 from app.services import audio_service
 
@@ -79,8 +83,82 @@ def get_audio(
         mime_type=record.mime_type,
         duration_seconds=record.duration_seconds,
         status=record.status.value,
+        original_sample_rate=record.original_sample_rate,
+        original_channels=record.original_channels,
+        processed_sample_rate=record.processed_sample_rate,
+        processed_channels=record.processed_channels,
+        processed_duration_seconds=record.processed_duration_seconds,
+        processed_filename=record.processed_filename,
+        preprocessing_error=record.preprocessing_error,
         created_at=record.created_at,
         updated_at=record.updated_at,
+    )
+
+
+@router.post(
+    "/{analysis_id}/preprocess",
+    response_model=AudioPreprocessResponse,
+    status_code=status.HTTP_200_OK,
+)
+def preprocess_audio(
+    analysis_id: uuid.UUID, db: Session = Depends(get_db)
+) -> AudioPreprocessResponse:
+    """Run the preprocessing pipeline and set status to READY_FOR_ANALYSIS."""
+    record = audio_service.preprocess_audio(analysis_id, db)
+    return AudioPreprocessResponse(
+        success=True,
+        analysis_id=str(record.id),
+        status=record.status,
+        audio=AudioMetadataBrief(
+            sample_rate=record.processed_sample_rate,
+            channels=record.processed_channels,
+            duration_seconds=record.processed_duration_seconds,
+        ),
+        message="Audio preprocessing completed successfully",
+    )
+
+
+@router.get(
+    "/{analysis_id}/preprocess",
+    response_model=PreprocessStatusResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_preprocess_status(
+    analysis_id: uuid.UUID, db: Session = Depends(get_db)
+) -> PreprocessStatusResponse:
+    """Return original/processed metadata plus any preprocessing error."""
+    record = audio_service.get_audio_analysis(analysis_id, db)
+    return PreprocessStatusResponse(
+        analysis_id=str(record.id),
+        status=record.status,
+        original=AudioMetadataBrief(
+            sample_rate=record.original_sample_rate,
+            channels=record.original_channels,
+            duration_seconds=record.duration_seconds,
+        ),
+        processed=AudioMetadataBrief(
+            sample_rate=record.processed_sample_rate,
+            channels=record.processed_channels,
+            duration_seconds=record.processed_duration_seconds,
+        ),
+        preprocessing_error=record.preprocessing_error,
+    )
+
+
+@router.get(
+    "/{analysis_id}/processed",
+    status_code=status.HTTP_200_OK,
+    response_class=FileResponse,
+)
+def get_processed_audio(
+    analysis_id: uuid.UUID, db: Session = Depends(get_db)
+) -> FileResponse:
+    """Stream the processed WAV audio. Never exposes filesystem paths."""
+    _, processed_path = audio_service.get_processed_audio_path(analysis_id, db)
+    return FileResponse(
+        str(processed_path),
+        media_type="audio/wav",
+        filename=processed_path.name,
     )
 
 

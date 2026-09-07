@@ -1,8 +1,8 @@
 """Test fixtures.
 
 Tests run against an in-memory SQLite database (dependency override) and
-an isolated temporary upload directory. No PostgreSQL or real storage is
-touched, so tests are fast and require no ML models.
+isolated temporary upload/processed directories. No PostgreSQL or real
+storage is touched, so tests are fast and require no ML models.
 """
 
 import os
@@ -20,14 +20,23 @@ os.environ["MAX_AUDIO_SIZE_MB"] = "1"
 _test_upload_dir = tempfile.mkdtemp(prefix="voiceshield_test_uploads_")
 os.environ["UPLOAD_DIR"] = _test_upload_dir
 
+os.environ["MIN_AUDIO_DURATION_SECONDS"] = "1"
+os.environ["MAX_AUDIO_DURATION_SECONDS"] = "4"
+os.environ["TARGET_SAMPLE_RATE"] = "16000"
+os.environ["SILENCE_THRESHOLD_DB"] = "-50"
+os.environ["TRIM_TOP_DB"] = "35"
+_test_processed_dir = tempfile.mkdtemp(prefix="voiceshield_test_processed_")
+os.environ["PROCESSED_AUDIO_DIR"] = _test_processed_dir
+
 from app.database.database import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _cleanup_upload_dir():
+def _cleanup_temp_dirs():
     yield
     shutil.rmtree(_test_upload_dir, ignore_errors=True)
+    shutil.rmtree(_test_processed_dir, ignore_errors=True)
 
 
 @pytest.fixture(scope="session")

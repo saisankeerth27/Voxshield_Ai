@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Activity,
   AudioLines,
+  BrainCircuit,
   Fingerprint,
   Gauge,
   History,
@@ -16,20 +16,42 @@ import StatusBadge from "../components/StatusBadge";
 import { useBackendHealth } from "../hooks/useBackendHealth";
 import { audioService } from "../services/audioService";
 import { formatTimestamp, formatFileSize } from "../utils/format";
-import type { AudioListItem } from "../types/analysis";
+import type { AudioAnalysis } from "../types/analysis";
 
-function MetricSection() {
+function formatProbability(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return "Not analyzed";
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function detectionStatus(analysis: AudioAnalysis | null): string {
+  if (!analysis?.deepfake_label) return "Not analyzed";
+  return analysis.deepfake_label === "synthetic"
+    ? "Synthetic voice"
+    : "Real voice";
+}
+
+function MetricSection({ analysis }: { analysis: AudioAnalysis | null }) {
+  const ai = analysis?.ai_probability ?? null;
+  const real = analysis?.real_probability ?? null;
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <MetricCard
         label="AI Generated Probability"
-        value="Not analyzed"
-        icon={<Activity className="h-5 w-5" />}
+        value={formatProbability(ai)}
+        status={ai === null ? "idle" : ai >= 0.8 ? "danger" : "ok"}
+        icon={<BrainCircuit className="h-5 w-5" />}
       />
       <MetricCard
         label="Real Voice Probability"
-        value="Not analyzed"
+        value={formatProbability(real)}
+        status={real === null ? "idle" : real >= 0.8 ? "ok" : "warn"}
         icon={<AudioLines className="h-5 w-5" />}
+      />
+      <MetricCard
+        label="Detection Status"
+        value={detectionStatus(analysis)}
+        status={analysis?.deepfake_label === "synthetic" ? "danger" : analysis?.deepfake_label ? "ok" : "idle"}
+        icon={<ShieldAlert className="h-5 w-5" />}
       />
       <MetricCard
         label="Speaker Similarity"
@@ -41,11 +63,6 @@ function MetricSection() {
         value="Not analyzed"
         icon={<Gauge className="h-5 w-5" />}
       />
-      <MetricCard
-        label="Risk Level"
-        value="Not analyzed"
-        icon={<ShieldAlert className="h-5 w-5" />}
-      />
     </div>
   );
 }
@@ -56,7 +73,7 @@ function SectionCard({
   children,
   action,
 }: {
-  icon: typeof Activity;
+  icon: typeof Radar;
   title: string;
   children: React.ReactNode;
   action?: React.ReactNode;
@@ -78,6 +95,7 @@ function SectionCard({
 function statusVariant(status: string): "ok" | "warn" | "danger" | "idle" {
   switch (status) {
     case "COMPLETED":
+    case "DEEPFAKE_ANALYZED":
       return "ok";
     case "FAILED":
       return "danger";
@@ -89,13 +107,13 @@ function statusVariant(status: string): "ok" | "warn" | "danger" | "idle" {
 }
 
 /**
- * Main dashboard. ML metric values intentionally read "Not analyzed" — no
- * fake predictions are generated. The Latest Analysis panel reflects the
- * most recent uploaded audio record (real data, not fabricated).
+ * Main dashboard. Deepfake metrics reflect real stored model predictions
+ * (no fabricated values); capabilities not implemented yet read
+ * "Not analyzed". The Latest Analysis panel shows the most recent record.
  */
 export default function DashboardPage() {
   const { backendOnline, loading } = useBackendHealth();
-  const [latest, setLatest] = useState<AudioListItem | null>(null);
+  const [latest, setLatest] = useState<AudioAnalysis | null>(null);
   const [historyCount, setHistoryCount] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(true);
 
@@ -109,8 +127,16 @@ export default function DashboardPage() {
       .list(1, 10)
       .then((data) => {
         if (cancelled) return;
-        setLatest(data.items[0] ?? null);
+        const first = data.items[0];
+        if (!first) {
+          setLatest(null);
+          setHistoryCount(data.total);
+          return;
+        }
         setHistoryCount(data.total);
+        return audioService.get(first.analysis_id).then((record) => {
+          if (!cancelled) setLatest(record);
+        });
       })
       .catch(() => {
         if (!cancelled) {
@@ -125,6 +151,12 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [backendOnline]);
+
+  const latestStatusLabel = historyLoading
+    ? "Loading…"
+    : latest
+      ? latest.status
+      : "No uploads";
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10">
@@ -145,7 +177,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-8">
-        <MetricSection />
+        <MetricSection analysis={latest} />
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
@@ -154,13 +186,7 @@ export default function DashboardPage() {
           title="Latest Analysis"
           action={
             <StatusBadge
-              label={
-                historyLoading
-                  ? "Loading…"
-                  : latest
-                    ? latest.status
-                    : "No uploads"
-              }
+              label={latestStatusLabel}
               variant={latest ? statusVariant(latest.status) : "idle"}
             />
           }
@@ -177,10 +203,24 @@ export default function DashboardPage() {
                 <span>{formatTimestamp(latest.created_at)}</span>
                 <span className="font-mono text-xs">{latest.analysis_id}</span>
               </div>
-              <p className="mt-2 text-slate-500">
-                Uploaded and stored. AI analysis will be attached here in a
-                later phase.
-              </p>
+              {latest.deepfake_label ? (
+                <p
+                  className={`mt-2 ${latest.deepfake_label === "synthetic" ? "text-red-400" : "text-emerald-400"}`}
+                >
+                  {latest.deepfake_label === "synthetic"
+                    ? "The model indicates AI-generated (synthetic) speech."
+                    : "The model indicates human speech."}{" "}
+                  <span className="text-slate-500">
+                    (AI {formatProbability(latest.ai_probability)} · Real{" "}
+                    {formatProbability(latest.real_probability)})
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-2 text-slate-500">
+                  Uploaded and stored. Run deepfake detection from the Analyze
+                  page.
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-sm text-slate-400">
@@ -238,8 +278,12 @@ export default function DashboardPage() {
               Audio upload pipeline: Operational (Phase 2)
             </li>
             <li className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-slate-600" />
-              Deepfake voice detection: Pending (later phase)
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              Audio preprocessing: Operational (Phase 3)
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              Deepfake voice detection: Operational (Phase 4)
             </li>
             <li className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-slate-600" />

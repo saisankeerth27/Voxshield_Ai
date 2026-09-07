@@ -28,6 +28,13 @@ soxr==1.1.0
 # Bundles a static FFmpeg binary used as a fallback when FFmpeg is not on PATH
 imageio-ffmpeg==0.6.0
 
+# ML inference (deepfake / synthetic speech detection)
+# CPU build (auto-set by pip on Windows/PyPI). For GPU support, install a
+# CUDA-enabled build instead, e.g.:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu124
+torch==2.14.0
+transformers==5.16.1
+
 # Testing
 pytest==8.3.4
 httpx==0.28.1

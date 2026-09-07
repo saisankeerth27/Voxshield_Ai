@@ -72,6 +72,20 @@ class AudioAnalysis(Base):
         String(2000), nullable=True
     )
 
+    # Deepfake / synthetic voice detection (filled by the ML pipeline)
+    ai_probability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    real_probability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    deepfake_label: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    deepfake_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    deepfake_model_version: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )
+    deepfake_processing_time: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )
+    deepfake_device: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    deepfake_error: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

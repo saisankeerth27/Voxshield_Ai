@@ -1,9 +1,12 @@
 import { api, API_BASE_URL } from "./api";
 import type {
+  AnalysisStatusResponse,
   AudioAnalysis,
   AudioListResponse,
   AudioPreprocessResponse,
   AudioUploadResponse,
+  DeepfakeResultResponse,
+  DeepfakeRunResponse,
   PreprocessStatusResponse,
 } from "../types/analysis";
 
@@ -75,6 +78,30 @@ export const audioService = {
     const response = await api.delete<{ success: boolean; message: string }>(
       `/audio/${analysisId}`,
     );
+    return response.data;
+  },
+
+  /** Run the deepfake detector on preprocessed audio and store the result. */
+  async runDeepfake(analysisId: string): Promise<DeepfakeRunResponse> {
+    const response = await api.post<DeepfakeRunResponse>(
+      `/analysis/${analysisId}/deepfake`,
+      undefined,
+      { timeout: 300000 },
+    );
+    return response.data;
+  },
+
+  /** Fetch the stored deepfake result without re-running inference. */
+  async getDeepfakeResult(analysisId: string): Promise<DeepfakeResultResponse> {
+    const response = await api.get<DeepfakeResultResponse>(
+      `/analysis/${analysisId}/deepfake`,
+    );
+    return response.data;
+  },
+
+  /** Probe which analysis capabilities are currently available. */
+  async getAnalysisStatus(): Promise<AnalysisStatusResponse> {
+    const response = await api.get<AnalysisStatusResponse>("/analysis/status");
     return response.data;
   },
 

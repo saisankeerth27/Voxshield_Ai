@@ -14,4 +14,7 @@ def test_health_returns_200() -> None:
 
 def test_health_status_is_healthy() -> None:
     response = client.get("/health")
-    assert response.json() == {"status": "healthy"}
+    body = response.json()
+    # Liveness first; model fields reflect the real (unloaded-in-tests) state.
+    assert body["status"] == "healthy"
+    assert body["deepfake_model"] in ("not_loaded", "loading", "loaded", "unavailable")

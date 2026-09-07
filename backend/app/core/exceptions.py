@@ -76,6 +76,32 @@ class PreprocessingError(VoiceShieldError):
     code = "preprocessing_failed"
 
 
+class DeepfakeModelUnavailableError(VoiceShieldError):
+    """503 - The deepfake detection model could not be loaded.
+
+    Returned when model weights are missing, the download failed, or the
+    configured model is unusable. Never returns a fabricated prediction.
+    """
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    code = "deepfake_model_unavailable"
+    detail = "Deepfake detection model is currently unavailable."
+
+
+class DeepfakeInputError(VoiceShieldError):
+    """400 - Audio supplied to the model is invalid for inference."""
+
+    status_code = status.HTTP_400_BAD_REQUEST
+    code = "deepfake_input_error"
+
+
+class DeepfakeDetectionError(VoiceShieldError):
+    """500 - Unexpected failure during deepfake inference."""
+
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    code = "deepfake_detection_failed"
+
+
 class ServiceUnavailableError(VoiceShieldError):
     """503 - Dependency (e.g. database) is unavailable."""
 

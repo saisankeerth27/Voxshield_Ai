@@ -46,6 +46,20 @@ class Settings(BaseSettings):
     # Optional explicit FFmpeg binary path (resolved otherwise)
     ffmpeg_binary: str = ""
 
+    # Deepfake / synthetic voice detection (ML)
+    # Model fine-tuned on real speech vs AI TTS / voice-cloning audio.
+    deepfake_model_name: str = "garystafford/wav2vec2-deepfake-voice-detector"
+    # Device resolution: auto | cpu | cuda
+    model_device: str = "auto"
+    # Hugging Face cache directory for downloaded weights (gitignored)
+    model_cache_dir: str = "models"
+    # Long-audio segmentation before inference (seconds per window)
+    model_chunk_seconds: int = 30
+    # Overlap between windows (seconds); 0 disables overlap.
+    model_overlap_seconds: int = 0
+    # Minimum segment duration that is meaningful for the model (seconds)
+    model_min_chunk_seconds: float = 0.5
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

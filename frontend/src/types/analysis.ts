@@ -6,6 +6,7 @@ export type AnalysisStatus =
   | "READY_FOR_ANALYSIS"
   | "PROCESSING"
   | "COMPLETED"
+  | "DEEPFAKE_ANALYZED"
   | "FAILED";
 
 export const MAX_UPLOAD_SIZE_MB = 25;
@@ -55,6 +56,14 @@ export interface AudioAnalysis {
   processed_duration_seconds: number | null;
   processed_filename: string | null;
   preprocessing_error: string | null;
+  ai_probability: number | null;
+  real_probability: number | null;
+  deepfake_label: string | null;
+  deepfake_model: string | null;
+  deepfake_model_version: string | null;
+  deepfake_processing_time: number | null;
+  deepfake_device: string | null;
+  deepfake_error: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -72,4 +81,34 @@ export interface AudioListResponse {
   page: number;
   limit: number;
   total: number;
+}
+
+export interface DeepfakeRunResponse {
+  analysis_id: string;
+  status: AnalysisStatus;
+  ai_probability: number;
+  real_probability: number;
+  predicted_class: string;
+  model: { name: string | null; version: string | null };
+  device: string;
+  processing_time_seconds: number;
+  message: string;
+}
+
+export interface DeepfakeResultResponse {
+  analysis_id: string;
+  status: AnalysisStatus;
+  ai_probability: number | null;
+  real_probability: number | null;
+  predicted_class: string | null;
+  model: { name: string | null; version: string | null };
+  device: string | null;
+  processing_time_seconds: number | null;
+  deepfake_error: string | null;
+}
+
+export interface AnalysisStatusResponse {
+  available: boolean;
+  deepfake: boolean;
+  message: string;
 }

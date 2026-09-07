@@ -7,6 +7,9 @@ class HealthResponse(BaseModel):
     """Response for the /health endpoint."""
 
     status: str
+    deepfake_model: str | None = None
+    model_name: str | None = None
+    model_device: str | None = None
 
 
 class ErrorDetail(BaseModel):

@@ -61,6 +61,17 @@ def _apply_forward_migrations() -> None:
         "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS processed_duration_seconds FLOAT",
         "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS processed_filename VARCHAR(255)",
         "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS preprocessing_error VARCHAR(2000)",
+        # Deepfake detection results
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS ai_probability FLOAT",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS real_probability FLOAT",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS deepfake_label VARCHAR(50)",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS deepfake_model VARCHAR(255)",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS deepfake_model_version VARCHAR(100)",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS deepfake_processing_time FLOAT",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS deepfake_device VARCHAR(50)",
+        "ALTER TABLE audio_analyses ADD COLUMN IF NOT EXISTS deepfake_error VARCHAR(2000)",
+        # New statuses for the extended enum (PostgreSQL only)
+        "ALTER TYPE audio_analysis_status ADD VALUE IF NOT EXISTS 'DEEPFAKE_ANALYZED'",
     ]
     with engine.connect() as conn:
         for statement in statements:

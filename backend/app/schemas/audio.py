@@ -38,6 +38,14 @@ class AudioAnalysisResponse(BaseModel):
     processed_duration_seconds: float | None
     processed_filename: str | None
     preprocessing_error: str | None
+    ai_probability: float | None
+    real_probability: float | None
+    deepfake_label: str | None
+    deepfake_model: str | None
+    deepfake_model_version: str | None
+    deepfake_processing_time: float | None
+    deepfake_device: str | None
+    deepfake_error: str | None
     created_at: datetime
     updated_at: datetime
 

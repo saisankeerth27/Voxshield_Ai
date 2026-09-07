@@ -192,6 +192,96 @@ def make_webm_bytes(duration_seconds: float = 2.0, sample_rate: int = 16000) -> 
     return proc.stdout
 
 
+def make_ogg_bytes(duration_seconds: float = 2.0, sample_rate: int = 16000) -> bytes:
+    """Encode a sine wave to Ogg/Vorbis via FFmpeg, skipping if unavailable."""
+    import subprocess
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        try:
+            import imageio_ffmpeg
+
+            ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            pytest.skip("FFmpeg is not available for OGG test fixtures.")
+
+    wav_path = write_wav_temp(duration_seconds, sample_rate, "_ogg_src")
+    proc = subprocess.run(
+        [
+            ffmpeg,
+            "-v",
+            "error",
+            "-y",
+            "-i",
+            str(wav_path),
+            "-c:a",
+            "libvorbis",
+            "-f",
+            "ogg",
+            "-",
+        ],
+        capture_output=True,
+        timeout=60,
+    )
+    if proc.returncode != 0 or not proc.stdout:
+        pytest.skip("FFmpeg could not build an OGG fixture: " + proc.stderr.decode())
+
+    import os
+
+    os.unlink(wav_path)
+    return proc.stdout
+
+
+def make_m4a_bytes(duration_seconds: float = 2.0, sample_rate: int = 16000) -> bytes:
+    """Encode a sine wave to M4A/AAC via FFmpeg, skipping if unavailable."""
+    import os
+    import subprocess
+    import tempfile
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        try:
+            import imageio_ffmpeg
+
+            ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            pytest.skip("FFmpeg is not available for M4A test fixtures.")
+
+    wav_path = write_wav_temp(duration_seconds, sample_rate, "_m4a_src")
+    fd, out_path = tempfile.mkstemp(suffix=".m4a")
+    os.close(fd)
+    try:
+        proc = subprocess.run(
+            [
+                ffmpeg,
+                "-v",
+                "error",
+                "-y",
+                "-i",
+                str(wav_path),
+                "-c:a",
+                "aac",
+                "-f",
+                "ipod",
+                out_path,
+            ],
+            capture_output=True,
+            timeout=60,
+        )
+        if proc.returncode != 0:
+            pytest.skip(
+                "FFmpeg could not build an M4A fixture: " + proc.stderr.decode()
+            )
+        with open(out_path, "rb") as fh:
+            data = fh.read()
+    finally:
+        os.unlink(wav_path)
+        os.unlink(out_path)
+    if not data:
+        pytest.skip("FFmpeg produced an empty M4A fixture.")
+    return data
+
+
 def write_wav_temp(
     duration_seconds: float = 2.0,
     sample_rate: int = 16000,

@@ -313,7 +313,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <p className="text-sm text-slate-400">
-              No analysis available. Start from the Analyze page.
+              No analyses yet. Upload or record an audio sample to begin.
             </p>
           )}
         </SectionCard>

@@ -1,146 +1,120 @@
 # VoiceShield
 
-**AI-Powered Real-Time Voice Cloning & Impersonation Attack Detection System**
+**AI-Powered Voice Cloning & Impersonation Attack Detection System**
 
-VoiceShield is an AI-powered system for detecting potential synthetic voice
-and impersonation attacks. It analyzes a voice sample and determines whether
-it is genuine human speech, AI-generated/synthetic speech, or a potential
-voice impersonation.
+VoiceShield detects potential AI-generated (deepfake) voices and speaker
+impersonation in short voice samples. It analyzes a sample through a
+multi-stage pipeline and produces a clear **LOW / MEDIUM / HIGH** risk
+verdict.
 
 > Treat every voice as an untrusted security signal.
 
 ## Project Description
 
-VoiceShield processes audio through a detection pipeline and produces an
-impersonation-risk assessment for the user.
+VoiceShield takes an audio file — or a live microphone recording — and runs
+it through a deterministic detection pipeline:
 
 ```
-Audio
-  ↓
-Preprocessing
-  ↓
-Deepfake Detection
-  ↓
-Speaker Verification
-  ↓
-Risk Fusion
-  ↓
-Alert
-  ↓
-Dashboard
+Audio (file or mic)
+    ↓
+Preprocessing          FFmpeg decode, mono downmix, 16 kHz resample,
+                       normalization, silence removal, quality validation
+    ↓
+Deepfake Detection     Wav2Vec2-based classifier → AI / real probability
+    ↓
+Speaker Verification   ECAPA-TDNN embedding → cosine similarity vs. a
+                       registered voiceprint
+    ↓
+Risk Fusion            Deterministic heuristic → risk score + severity
+    ↓
+Details + HTML Report  Per-stage results and a printable report
 ```
 
-## Problem
+All ML predictions come from real model inference. There are **no
+hardcoded or fabricated results** anywhere in the backend or frontend; if a
+model is unavailable the API returns a service error rather than a fake
+answer.
 
-AI voice cloning can make impersonation attacks more convincing. Voice
-samples are used to spoof voice biometrics, run social-engineering scams
-over phone calls, and forge audio evidence. Short voice samples are now
-enough to clone a person's voice convincingly.
+## Features
 
-## Solution
-
-VoiceShield combines two complementary signals into a single risk verdict:
-
-1. **Deepfake Detection** — determines whether audio was AI-generated or
-   manipulated.
-2. **Speaker Verification** — compares a voice against a registered speaker
-   profile to expose impersonation.
-
-These signals are fused into a **risk score** with a clear
-**LOW / MEDIUM / HIGH** classification, surfaced on the dashboard with
-detection history.
-
-## Current Phase
-
-**Phase 3 — Audio Preprocessing Pipeline**
-
-- Upload pipeline (Phase 2): validation, UUID storage, analysis records,
-  history/dashboard UI.
-- Audio preprocessing: FFmpeg decode, mono conversion, 16 kHz resampling,
-  amplitude normalization, silence handling, quality validation,
-  processed-audio storage + streaming.
-
-**No AI predictions are generated yet.** Values display "Not analyzed"
-until the ML phases arrive.
-
-## Microphone Recording & Analysis
-
-The **Analyze** page can record straight from the browser microphone instead
-of uploading a file:
-
-- Recording uses the standard `getUserMedia` + `MediaRecorder` APIs, so no
-  server-side streaming is involved. Permission is requested only when you
-  press **Start recording**, never on page load.
-- Recordings are capped at **60 seconds** and auto-stop at the cap.
-- Recorded audio is sent through the exact same upload → preprocess →
-  deepfake → speaker → risk pipeline as file uploads. It is marked with
-  `source=MICROPHONE` so the **History** page can tell mic captures apart
-  from file uploads (each row shows a **Mic** or **Upload** badge).
-- The analysis updates near-real-time: each stage only flips to *done* when
-  the backend has really completed it. If no speaker profile is registered,
-  speaker impersonation verification is marked *skipped* and the risk stage
-  is not run (no fabricated scores).
-- WebM (.webm, typical of mic captures) is accepted alongside WAV/MP3/M4A/OGG.
-
-See [`docs/microphone-analysis.md`](docs/microphone-analysis.md) for details.
+- **Audio upload** — WAV, MP3, M4A, OGG, and WebM accepted; extension,
+  MIME, and size validation; UUID storage names (user filenames are never
+  used on disk).
+- **Microphone recording** — browser `getUserMedia` + `MediaRecorder`
+  (WebM/Opus), 60-second cap, permission requested only on start,
+  recordings flow through the same pipeline marked `source=MICROPHONE`.
+- **Deepfake detection** — `garystafford/wav2vec2-deepfake-voice-detector`
+  (long audio is segmented for inference).
+- **Speaker verification** — SpeechBrain `ECAPA-TDNN` (VoxCeleb) cosine
+  similarity against a registered voiceprint. Embeddings are stored
+  backend-only and **never returned to the frontend**.
+- **Risk fusion** — deterministic, transparent heuristic combining deepfake
+  probability (60%) and speaker similarity (40%) into a single risk score,
+  with an explanation and recommendation.
+- **Details page** — full per-stage results with reference metadata.
+- **Printable report** — a backend-generated HTML report rendered in an
+  isolated view for print / save-as-PDF.
+- **History & dashboard** — paginated detection history with Mic/Upload
+  badges, latest-analysis summary, risk status, and backend health.
+- **Health endpoint** — reports application, database, and model loading
+  state.
 
 ## Technology Stack
 
-| Layer      | Technology                                                       |
-| ---------- | ---------------------------------------------------------------- |
-| Frontend   | React, TypeScript, Vite, Tailwind CSS, React Router, Axios, Recharts, Web Audio API, MediaRecorder API |
-| Backend    | Python, FastAPI, Uvicorn, SQLAlchemy, Pydantic, python-dotenv    |
-| Database   | PostgreSQL                                                       |
-| Audio      | FFmpeg, Librosa, NumPy, SoundFile                               |
-| AI/ML      | PyTorch, Wav2Vec2, SpeechBrain, ECAPA-TDNN (future phases)      |
+| Layer      | Technology                                                                 |
+| ---------- | -------------------------------------------------------------------------- |
+| Frontend   | React, TypeScript, Vite, Tailwind CSS, React Router, Axios, lucide-react   |
+| Backend    | Python, FastAPI, Uvicorn, SQLAlchemy, Pydantic                              |
+| Database   | PostgreSQL (default) / SQLite (tests)                                       |
+| Audio      | FFmpeg (with `imageio-ffmpeg` fallback), Librosa, NumPy, SoundFile          |
+| AI/ML      | PyTorch, Hugging Face Transformers (Wav2Vec2), SpeechBrain (ECAPA-TDNN)    |
+
+## Security Notes
+
+- Uploads are stored under generated UUID filenames and are **not** mounted
+  as static files; only processed audio is streamed back through an
+  authenticated-by-ID endpoint.
+- Speaker embeddings persist server-side only and are never serialized in
+  any API response.
+- CORS is restricted to local development origins.
+- `.env` files are gitignored — only documented `.env.example` files are
+  committed. Model weights, uploads, processed audio, and databases are
+  gitignored.
 
 ## Running Locally
 
-Docker is **NOT** required. PostgreSQL must be installed and running
-locally.
+Docker is **not** required. PostgreSQL must be installed and running
+locally (or point `DATABASE_URL` at any reachable PostgreSQL instance).
 
 ### 1. Backend
 
 ```bash
 cd backend
 python -m venv venv
-```
+venv\Scripts\activate      # Windows
+source venv/bin/activate   # macOS / Linux
 
-Windows:
-
-```bash
-venv\Scripts\activate
-```
-
-macOS / Linux:
-
-```bash
-source venv/bin/activate
-```
-
-Install dependencies and configure environment:
-
-```bash
 pip install -r requirements.txt
-cp .env.example .env
+copy .env.example .env     # Windows
+cp .env.example .env       # macOS / Linux
 # edit .env and set DATABASE_URL
-```
-
-Run the backend:
-
-```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
 - API docs: http://localhost:8000/docs
 - Health check: http://localhost:8000/health
 
+The first startup downloads the deepfake and speaker model weights into
+`models/` (gitignored). This can take a while; the API reports model
+loading state via `/health` in the meantime.
+
 ### 2. Frontend
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env
+copy .env.example .env     # Windows
+cp .env.example .env       # macOS / Linux
 npm run dev
 ```
 
@@ -148,10 +122,46 @@ Open http://localhost:5173
 
 ### 3. PostgreSQL
 
-Create the database:
-
 ```sql
 CREATE DATABASE voiceshield;
+```
+
+Tables and storage directories are created automatically at backend
+startup.
+
+## Demo Flow (2–3 minutes)
+
+1. **Profile** — register a speaker voiceprint (a short "reference" audio
+   clip). This powers speaker verification.
+2. **Analyze** — upload a WAV/MP3/M4A/OGG file, or record from the
+   microphone, then run each stage:
+   - **Prepare audio** → preprocessing report.
+   - **Detect AI voice** → AI probability, real probability, label.
+   - **Verify speaker** → cosine similarity vs. the registered voiceprint
+     (skipped with a clear message when no profile exists — never faked).
+   - **Calculate risk** → risk score, severity, explanation, and
+     recommendation.
+3. **Details** — inspect per-stage results.
+4. **Report** — open the printable HTML report and save as PDF.
+5. **History / Dashboard** — confirm the record, detections, and risk
+   appear stored from the database.
+
+## Tests
+
+Backend (SQLite in-memory, no models required — deterministic fakes):
+
+```bash
+cd backend
+venv\Scripts\activate
+python -m pytest tests/ -q
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm test -- --run
+npm run build
 ```
 
 ## Project Structure
@@ -159,42 +169,56 @@ CREATE DATABASE voiceshield;
 ```
 ├── frontend/
 │   └── src/
-│       ├── components/   # Waveform, player, dropzone, badges
-│       ├── pages/        # Landing, Dashboard, Analyze, History, Profile
+│       ├── components/   # Metric cards, badges, risk alert, dropzone
+│       ├── pages/        # Dashboard, Analyze, History, Profile, Details, Report
 │       ├── layouts/      # App shell
-│       ├── services/     # api, audio, analysis, profile
-│       ├── hooks/        # useRecorder, useVoiceAnalysis, useUploadFlow, useBackendHealth
+│       ├── services/     # API clients (audio, analysis, profile)
+│       ├── hooks/        # useRecorder, useVoiceAnalysis, useBackendHealth
 │       ├── types/        # audio, analysis, api
-│       ├── utils/        # validation, formatting, api errors
-│       └── assets/       # static assets
+│       └── utils/        # validation, formatting, api errors
 ├── backend/
 │   ├── app/
 │   │   ├── api/routes/   # health, audio, analysis, profile
-│   │   ├── audio/        # preprocessing pipeline (Phase 3)
+│   │   ├── audio/        # FFmpeg loader + preprocessing pipeline
 │   │   ├── core/         # config, exceptions
 │   │   ├── database/     # SQLAlchemy engine/session/base
 │   │   ├── models/       # ORM models
 │   │   ├── schemas/      # Pydantic schemas
-│   │   ├── services/     # business logic
-│   │   ├── ml/           # ML abstractions (future phase)
-│   │   ├── websocket/    # realtime (future phase)
-│   │   └── main.py
+│   │   ├── services/     # business logic (audio, deepfake, speaker, risk)
+│   │   ├── ml/           # load-once model managers + abstractions
+│   │   └── main.py       # lifespan, CORS, exception handlers
 │   ├── tests/            # pytest (SQLite in-memory)
 │   └── requirements.txt
-├── docs/
+├── docs/                 # phase write-ups
 └── scripts/
 ```
 
 ## Status
 
-- **Phase 1:** Project foundation — pages, routing, services, audio selection
-  UI, health endpoint, database foundation.
-- **Phase 2:** Audio upload pipeline — validation, storage, analysis records,
-  history UI.
-- **Phase 3 (current):** Audio preprocessing pipeline.
-- **Later:** Deepfake detection (Wav2Vec2), speaker verification
-  (ECAPA-TDNN), risk fusion, realtime WebSocket analysis, detection history,
-  alerts.
+All implemented phases are complete and integrated:
 
-This is a **single-user / local** application for now. There is no login,
-registration, or authentication.
+- **Phase 1** — foundation: pages, routing, services, health endpoint.
+- **Phase 2** — audio upload pipeline + history.
+- **Phase 3** — audio preprocessing pipeline (decode, normalize, validate).
+- **Phase 4** — deepfake voice detection (real Wav2Vec2 model).
+- **Phase 5** — speaker verification (real ECAPA-TDNN model).
+- **Phase 6** — risk fusion engine.
+- **Phase 7** — dashboard & history enhancements.
+- **Phase 8** — microphone recording & analysis.
+- **Phase 9** — analysis details page + printable HTML report.
+- **Phase 10** — final integration, hardening, and hackathon readiness.
+
+## Limitations
+
+- **Single-user / local application.** There is no login, registration, or
+  authentication; session tokens and realtime alerting are out of scope.
+- **Risk engine is a deterministic MVP heuristic**, not a validated
+  probability of attack, and the speaker-similarity threshold and risk
+  thresholds have **not** been calibrated for security-critical use.
+- The ML models load at startup and run on CPU here (CUDA is not
+  available in the demo environment), so first inference can be slow.
+- PostgreSQL is used at runtime; the automated test suite runs against
+  SQLite in-memory.
+
+See [`docs/microphone-analysis.md`](docs/microphone-analysis.md) for the
+microphone pipeline details.

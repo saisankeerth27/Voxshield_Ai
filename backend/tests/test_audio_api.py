@@ -7,8 +7,16 @@ directory that is cleaned up automatically.
 import uuid
 
 import pytest
+from sqlalchemy import delete
+from sqlalchemy.orm import Session
 
-from tests.helpers import make_wav
+from app.models.audio import AudioAnalysis
+from tests.helpers import (
+    make_m4a_bytes,
+    make_mp3_bytes,
+    make_ogg_bytes,
+    make_wav,
+)
 
 UPLOAD_FILE = {"file": ("sample.wav", make_wav(duration_seconds=0.5), "audio/wav")}
 
@@ -38,6 +46,49 @@ def test_upload_valid_wav_stores_duration(client):
 
     detail = client.get(f"/audio/{analysis_id}").json()
     assert detail["duration_seconds"] == pytest.approx(1.0, abs=0.01)
+
+
+def test_upload_valid_mp3(client):
+    response = client.post(
+        "/audio/upload",
+        files={"file": ("clip.mp3", make_mp3_bytes(duration_seconds=2.0), "audio/mpeg")},
+    )
+    assert response.status_code == 200
+    assert response.json()["analysis_id"] is not None
+
+
+def test_upload_valid_ogg(client):
+    response = client.post(
+        "/audio/upload",
+        files={"file": ("clip.ogg", make_ogg_bytes(duration_seconds=2.0), "audio/ogg")},
+    )
+    assert response.status_code == 200
+    assert response.json()["analysis_id"] is not None
+
+
+def test_upload_valid_m4a(client):
+    response = client.post(
+        "/audio/upload",
+        files={"file": ("clip.m4a", make_m4a_bytes(duration_seconds=2.0), "audio/mp4")},
+    )
+    assert response.status_code == 200
+    assert response.json()["analysis_id"] is not None
+
+
+def test_upload_corrupted_bytes_stored_then_fails_at_preprocess(client):
+    # Validation checks extension/MIME/size, not content. The corruption is
+    # caught downstream by the preprocessing decoder, never at upload time.
+    response = client.post(
+        "/audio/upload",
+        files={"file": ("broken.wav", b"this is definitely not audio data", "audio/wav")},
+    )
+    assert response.status_code == 200
+    analysis_id = response.json()["analysis_id"]
+
+    pre = client.post(f"/audio/{analysis_id}/preprocess")
+    assert pre.status_code == 400
+    assert pre.json()["error"]["code"] == "bad_request"
+    assert "Unable to decode" in pre.json()["error"]["message"]
 
 
 def test_upload_invalid_extension(client):
@@ -118,6 +169,18 @@ def test_list_analyses_pagination(client):
     assert body["limit"] == 2
     assert body["total"] >= 3
     assert len(body["items"]) == 2
+
+
+def test_list_analyses_empty_database(client, test_engine):
+    with Session(test_engine) as session:
+        session.execute(delete(AudioAnalysis))
+        session.commit()
+
+    response = client.get("/audio?page=1&limit=10")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 0
+    assert body["items"] == []
 
 
 def test_delete_analysis(client):

@@ -70,7 +70,7 @@ export default function ReportPage() {
       {loading ? (
         <div className="flex items-center justify-center py-24">
           <Loader2 className="h-6 w-6 animate-spin text-emerald-400" />
-          <span className="ml-3 text-sm text-slate-400">Preparing report…</span>
+          <span className="ml-3 text-sm text-slate-400">Generating report…</span>
         </div>
       ) : error ? (
         <div className="px-6 py-16">
